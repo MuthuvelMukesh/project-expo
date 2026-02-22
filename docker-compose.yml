@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  # ── PostgreSQL Database ──────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: campusiq-db
+    environment:
+      POSTGRES_USER: campusiq
+      POSTGRES_PASSWORD: campusiq_secret
+      POSTGRES_DB: campusiq
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campusiq"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis Cache ──────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: campusiq-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ──────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: campusiq-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://campusiq:campusiq_secret@db:5432/campusiq
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: campusiq-hackathon-secret-key-change-in-production
+      OLLAMA_BASE_URL: http://ollama:11434
+      MODEL_PATH: app/ml/models
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "python -m app.seed_db &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # ── React Frontend ──────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: campusiq-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+
+  # ── Ollama (Local LLM) ─────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: campusiq-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  postgres_data:
+  ollama_data:
