@@ -92,7 +92,7 @@ async def seed():
         # ── Admin User ──
         admin_user = User(
             email="admin@campusiq.edu",
-            hashed_password=hash_password("admin123"),
+            hashed_password=hash_password("admin123"[:72]),
             full_name="Campus Administrator",
             role=UserRole.ADMIN,
         )
@@ -106,7 +106,7 @@ async def seed():
             dept_code = list(departments.keys())[i % len(departments)]
             user = User(
                 email=f"faculty{i+1}@campusiq.edu",
-                hashed_password=hash_password("faculty123"),
+                hashed_password=hash_password("faculty123"[:72]),
                 full_name=fname,
                 role=UserRole.FACULTY,
             )
@@ -153,7 +153,7 @@ async def seed():
             dept_code = list(departments.keys())[i % len(departments)]
             user = User(
                 email=f"student{i+1}@campusiq.edu",
-                hashed_password=hash_password("student123"),
+                hashed_password=hash_password("student123"[:72]),
                 full_name=sname,
                 role=UserRole.STUDENT,
             )

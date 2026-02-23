@@ -12,14 +12,18 @@ from passlib.context import CryptContext
 from app.core.config import get_settings
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    # Truncate password to 72 bytes for bcrypt compatibility
+    password = password[:72]
     return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    # Truncate password to 72 bytes for bcrypt compatibility
+    plain = plain[:72]
     return pwd_context.verify(plain, hashed)
 
 
