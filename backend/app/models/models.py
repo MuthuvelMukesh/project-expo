@@ -168,3 +168,19 @@ class Notification(Base):
 
     # Relationships
     user = relationship("User")
+
+
+class Timetable(Base):
+    """Weekly timetable schedule entries."""
+    __tablename__ = "timetable"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
+    day_of_week = Column(Integer, nullable=False)  # 0=Monday ... 5=Saturday
+    start_time = Column(String(5), nullable=False)  # "09:00"
+    end_time = Column(String(5), nullable=False)    # "10:00"
+    room = Column(String(50), nullable=False)
+    class_type = Column(String(20), default="lecture")  # lecture, lab, tutorial
+
+    # Relationships
+    course = relationship("Course")

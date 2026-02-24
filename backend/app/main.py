@@ -44,6 +44,7 @@ from app.api.routes import (
     auth, students, faculty, attendance, predictions,
     chatbot, admin, nlp_crud, copilot,
     users, courses, departments, notifications, export,
+    timetable,
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -60,3 +61,5 @@ app.include_router(courses.router, prefix="/api/courses", tags=["Course Manageme
 app.include_router(departments.router, prefix="/api/departments", tags=["Department Management"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(export.router, prefix="/api/export", tags=["Export"])
+app.include_router(timetable.router, prefix="/api/timetable", tags=["Timetable"])
+

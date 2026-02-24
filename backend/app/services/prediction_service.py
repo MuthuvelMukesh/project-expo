@@ -6,6 +6,7 @@ ML model loading, inference, and SHAP explanations.
 import os
 import json
 import random
+import logging
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from app.models.models import Student, Prediction, Attendance, Course
 from app.core.config import get_settings
 
 settings = get_settings()
+log = logging.getLogger("campusiq.predictions")
 
 # Try to import ML libraries
 try:
@@ -39,7 +41,9 @@ def _load_model():
     try:
         _model = ml_load_model()
         _explainer = get_explainer()
-    except Exception:
+        log.info("ML model loaded successfully.")
+    except Exception as e:
+        log.warning("ML model could not be loaded — using demo predictions: %s", e)
         _model = None
         _explainer = None
     return _model

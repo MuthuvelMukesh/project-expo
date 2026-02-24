@@ -415,3 +415,30 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=6)
+
+
+# ─── Timetable ───────────────────────────────────────────────────
+
+class TimetableSlotCreate(BaseModel):
+    course_id: int
+    day_of_week: int = Field(..., ge=0, le=5)  # 0=Mon ... 5=Sat
+    start_time: str = Field(..., example="09:00")
+    end_time: str = Field(..., example="10:00")
+    room: str = Field(..., example="LH-301")
+    class_type: str = Field(default="lecture")
+
+
+class TimetableSlotOut(BaseModel):
+    id: int
+    course_id: int
+    course_name: str = ""
+    course_code: str = ""
+    instructor_name: str = ""
+    day_of_week: int
+    start_time: str
+    end_time: str
+    room: str
+    class_type: str
+
+    class Config:
+        from_attributes = True

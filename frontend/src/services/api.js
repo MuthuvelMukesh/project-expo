@@ -298,6 +298,12 @@ class ApiService {
         return base;
     }
 
+    // ─── Timetable ────────────────────────────────────────────
+    getStudentTimetable() { return this.request('/timetable/student'); }
+    getFacultyTimetable() { return this.request('/timetable/faculty'); }
+    createTimetableSlot(data) { return this.request('/timetable/', { method: 'POST', body: JSON.stringify(data) }); }
+    deleteTimetableSlot(id) { return this.request(`/timetable/${id}`, { method: 'DELETE' }); }
+
     // ─── Utility ─────────────────────────────────────────────
     logout() {
         this.setToken(null);

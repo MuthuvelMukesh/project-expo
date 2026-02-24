@@ -10,6 +10,7 @@ import CourseManagement from './pages/CourseManagement';
 import DepartmentManagement from './pages/DepartmentManagement';
 import StudentProfile from './pages/StudentProfile';
 import AttendanceDetails from './pages/AttendanceDetails';
+import TimetablePage from './pages/Timetable';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const { user, loading } = useAuth();
@@ -50,6 +51,7 @@ export default function App() {
                     <Route path="/profile" element={<ProtectedRoute allowedRoles={['student']}><StudentProfile /></ProtectedRoute>} />
                     <Route path="/attendance" element={<ProtectedRoute allowedRoles={['student']}><AttendanceDetails /></ProtectedRoute>} />
                     <Route path="/faculty" element={<ProtectedRoute allowedRoles={['faculty']}><FacultyConsole /></ProtectedRoute>} />
+                    <Route path="/timetable" element={<ProtectedRoute allowedRoles={['student', 'faculty']}><TimetablePage /></ProtectedRoute>} />
                     <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminPanel /></ProtectedRoute>} />
                     <Route path="/manage-users" element={<ProtectedRoute allowedRoles={['admin']}><UserManagement /></ProtectedRoute>} />
                     <Route path="/manage-courses" element={<ProtectedRoute allowedRoles={['admin']}><CourseManagement /></ProtectedRoute>} />

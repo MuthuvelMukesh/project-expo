@@ -144,12 +144,14 @@ async def get_course_attendance_analytics(db: AsyncSession, course_id: int):
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    # Get all attendance records grouped by date
+    from sqlalchemy import case
+
+    # Get attendance records grouped by date using correct SQLAlchemy syntax
     records = await db.execute(
         select(
             Attendance.date,
             func.count(Attendance.id).label("total"),
-            func.sum(func.cast(Attendance.is_present, type_=func.integer if hasattr(func, 'integer') else None)).label("present"),
+            func.sum(case((Attendance.is_present == True, 1), else_=0)).label("present"),
         )
         .where(Attendance.course_id == course_id)
         .group_by(Attendance.date)
@@ -158,12 +160,19 @@ async def get_course_attendance_analytics(db: AsyncSession, course_id: int):
     )
 
     trend = []
+    total_pct_sum = 0
     for row in records:
+        present_count = int(row.present or 0)
+        total_count = int(row.total or 0)
         trend.append({
             "date": row.date.isoformat() if row.date else "",
-            "present_count": int(row.present or 0),
-            "absent_count": int((row.total or 0) - (row.present or 0)),
+            "present_count": present_count,
+            "absent_count": total_count - present_count,
         })
+        if total_count > 0:
+            total_pct_sum += present_count / total_count * 100
+
+    avg_attendance = round(total_pct_sum / len(trend), 1) if trend else 0
 
     # Count unique students
     student_count = await db.execute(
@@ -172,12 +181,31 @@ async def get_course_attendance_analytics(db: AsyncSession, course_id: int):
     )
     total_students = student_count.scalar() or 0
 
+    # Count students below 75% attendance
+    below_75 = 0
+    if total_students > 0:
+        per_student = await db.execute(
+            select(
+                Attendance.student_id,
+                func.count(Attendance.id).label("total"),
+                func.sum(case((Attendance.is_present == True, 1), else_=0)).label("present"),
+            )
+            .where(Attendance.course_id == course_id)
+            .group_by(Attendance.student_id)
+        )
+        for s_row in per_student:
+            s_total = int(s_row.total or 0)
+            s_present = int(s_row.present or 0)
+            if s_total > 0 and (s_present / s_total * 100) < 75:
+                below_75 += 1
+
     return {
         "course_id": course.id,
         "course_name": course.name,
         "total_students": total_students,
-        "avg_attendance": 0,
+        "avg_attendance": avg_attendance,
         "trend": trend,
-        "at_risk_students": 0,
-        "below_75_count": 0,
+        "at_risk_students": below_75,
+        "below_75_count": below_75,
     }
+

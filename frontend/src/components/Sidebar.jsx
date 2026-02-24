@@ -11,12 +11,14 @@ import ThemeToggle from './ThemeToggle';
 const navConfig = {
     student: [
         { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { to: '/timetable', icon: CalendarCheck, label: 'Timetable' },
         { to: '/profile', icon: User, label: 'My Profile' },
         { to: '/attendance', icon: CalendarDays, label: 'Attendance' },
         { to: '/copilot', icon: Sparkles, label: 'AI Copilot' },
     ],
     faculty: [
         { to: '/faculty', icon: BookOpen, label: 'My Classes' },
+        { to: '/timetable', icon: CalendarCheck, label: 'Timetable' },
         { to: '/copilot', icon: Sparkles, label: 'AI Copilot' },
     ],
     admin: [

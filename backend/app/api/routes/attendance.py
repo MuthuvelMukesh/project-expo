@@ -3,7 +3,7 @@ CampusIQ — Attendance Routes
 QR generation, marking, and analytics endpoints.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -41,7 +41,7 @@ async def mark_student_attendance(
     result = await db.execute(select(Student).where(Student.user_id == current_user.id))
     student = result.scalar_one_or_none()
     if not student:
-        return {"error": "Student profile not found"}
+        raise HTTPException(status_code=404, detail="Student profile not found")
     return await mark_attendance(db, data.qr_token, student.id)
 
 

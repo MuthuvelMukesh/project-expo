@@ -3,7 +3,7 @@ CampusIQ — Student Routes
 Student dashboard, profile, attendance, and prediction endpoints.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -27,7 +27,7 @@ async def get_student_dashboard(
     result = await db.execute(select(Student).where(Student.user_id == current_user.id))
     student = result.scalar_one_or_none()
     if not student:
-        return {"error": "Student profile not found. Please contact admin."}
+        raise HTTPException(status_code=404, detail="Student profile not found. Please contact admin.")
 
     # Get attendance summary
     attendance_summary = await get_student_attendance_summary(db, student.id)
@@ -78,7 +78,7 @@ async def get_my_profile(
     result = await db.execute(select(Student).where(Student.user_id == current_user.id))
     student = result.scalar_one_or_none()
     if not student:
-        return {"error": "Student profile not found"}
+        raise HTTPException(status_code=404, detail="Student profile not found")
 
     dept = await db.execute(select(Department).where(Department.id == student.department_id))
     dept_obj = dept.scalar_one_or_none()
@@ -108,7 +108,7 @@ async def update_my_profile(
     result = await db.execute(select(Student).where(Student.user_id == current_user.id))
     student = result.scalar_one_or_none()
     if not student:
-        return {"error": "Student profile not found"}
+        raise HTTPException(status_code=404, detail="Student profile not found")
 
     if "section" in data:
         student.section = data["section"]
@@ -128,7 +128,7 @@ async def get_my_attendance(
     result = await db.execute(select(Student).where(Student.user_id == current_user.id))
     student = result.scalar_one_or_none()
     if not student:
-        return {"error": "Student profile not found"}
+        raise HTTPException(status_code=404, detail="Student profile not found")
 
     return await get_student_attendance_summary(db, student.id)
 
@@ -142,7 +142,7 @@ async def get_my_attendance_details(
     result = await db.execute(select(Student).where(Student.user_id == current_user.id))
     student = result.scalar_one_or_none()
     if not student:
-        return {"error": "Student profile not found"}
+        raise HTTPException(status_code=404, detail="Student profile not found")
 
     # Get all attendance records
     stmt = (
@@ -202,7 +202,7 @@ async def get_my_predictions(
     result = await db.execute(select(Student).where(Student.user_id == current_user.id))
     student = result.scalar_one_or_none()
     if not student:
-        return {"error": "Student profile not found"}
+        raise HTTPException(status_code=404, detail="Student profile not found")
 
     return await predict_student_performance(db, student.id)
 

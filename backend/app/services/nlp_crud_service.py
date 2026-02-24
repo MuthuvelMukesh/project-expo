@@ -7,6 +7,7 @@ with keyword-based fallback when LLM is unavailable.
 
 import json
 import re
+import logging
 import httpx
 from typing import Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +20,7 @@ from app.models.models import (
 )
 
 settings = get_settings()
+log = logging.getLogger("campusiq.nlp_crud")
 
 # ─── Model Registry ─────────────────────────────────────────────
 # Maps natural language entity names to SQLAlchemy models + metadata
@@ -193,8 +195,14 @@ Return ONLY valid JSON, no other text."""
                 if json_match:
                     return json.loads(json_match.group())
 
-    except Exception:
-        pass
+    except httpx.ConnectError:
+        log.info("Ollama not reachable for NLP intent detection — using keyword fallback.")
+    except httpx.TimeoutException:
+        log.warning("Ollama timed out during intent detection for: %s", message[:80])
+    except json.JSONDecodeError as e:
+        log.warning("Failed to parse LLM response as JSON: %s", e)
+    except Exception as e:
+        log.error("Unexpected error in detect_intent_llm: %s", e, exc_info=True)
 
     return None
 

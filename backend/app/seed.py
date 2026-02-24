@@ -15,6 +15,7 @@ from app.core.database import engine, AsyncSessionLocal, Base
 from app.core.security import hash_password
 from app.models.models import (
     User, UserRole, Student, Faculty, Department, Course, Attendance, Prediction,
+    Timetable,
 )
 
 # ─── Configuration ────────────────────────────────────────────────
@@ -92,7 +93,7 @@ async def seed():
         # ── Admin User ──
         admin_user = User(
             email="admin@campusiq.edu",
-            hashed_password=hash_password("admin123"[:72]),
+            hashed_password=hash_password("admin123"),
             full_name="Campus Administrator",
             role=UserRole.ADMIN,
         )
@@ -106,7 +107,7 @@ async def seed():
             dept_code = list(departments.keys())[i % len(departments)]
             user = User(
                 email=f"faculty{i+1}@campusiq.edu",
-                hashed_password=hash_password("faculty123"[:72]),
+                hashed_password=hash_password("faculty123"),
                 full_name=fname,
                 role=UserRole.FACULTY,
             )
@@ -153,7 +154,7 @@ async def seed():
             dept_code = list(departments.keys())[i % len(departments)]
             user = User(
                 email=f"student{i+1}@campusiq.edu",
-                hashed_password=hash_password("student123"[:72]),
+                hashed_password=hash_password("student123"),
                 full_name=sname,
                 role=UserRole.STUDENT,
             )
@@ -235,6 +236,36 @@ async def seed():
 
         await db.commit()
         print(f"✅ Created {prediction_count} predictions")
+
+        # ── Timetable ──
+        time_slots = [
+            ("09:00", "10:00"), ("10:15", "11:15"), ("11:30", "12:30"),
+            ("14:00", "15:00"), ("15:15", "16:15"), ("16:30", "17:30"),
+        ]
+        rooms = ["LH-101", "LH-102", "LH-201", "LH-202", "LH-301", "LH-302",
+                 "LAB-A", "LAB-B", "LAB-C", "TUT-1", "TUT-2"]
+        class_types = ["lecture", "lecture", "lecture", "lab", "tutorial"]
+        timetable_count = 0
+
+        for code, course in courses.items():
+            # Give each course 3 slots spread across the week
+            used_days = random.sample(range(6), k=min(3, 6))  # 3 random days
+            for day in used_days:
+                slot_idx = random.randint(0, len(time_slots) - 1)
+                start, end = time_slots[slot_idx]
+                tt = Timetable(
+                    course_id=course.id,
+                    day_of_week=day,
+                    start_time=start,
+                    end_time=end,
+                    room=random.choice(rooms),
+                    class_type=random.choice(class_types),
+                )
+                db.add(tt)
+                timetable_count += 1
+
+        await db.commit()
+        print(f"✅ Created {timetable_count} timetable entries")
 
     print("\n" + "=" * 50)
     print("🎉 Seed complete! Demo credentials:")

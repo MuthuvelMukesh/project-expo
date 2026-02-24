@@ -7,8 +7,9 @@ plans with human-in-the-loop confirmation for destructive operations.
 import json
 import re
 import uuid
+import logging
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -22,6 +23,7 @@ from app.models.models import (
 from app.services.nlp_crud_service import process_nlp_crud, MODEL_REGISTRY
 
 settings = get_settings()
+log = logging.getLogger("campusiq.copilot")
 
 # ─── Role Capability Matrix ─────────────────────────────────────
 ROLE_CAPABILITIES = {
@@ -139,8 +141,14 @@ Return ONLY a valid JSON array, no other text."""
                 if json_match:
                     return json.loads(json_match.group())
 
-    except Exception:
-        pass
+    except httpx.ConnectError:
+        log.info("Ollama not reachable for copilot action planning — using keyword fallback.")
+    except httpx.TimeoutException:
+        log.warning("Ollama timed out during copilot action planning.")
+    except json.JSONDecodeError as e:
+        log.warning("Copilot LLM returned invalid JSON: %s", e)
+    except Exception as e:
+        log.error("Unexpected error in copilot _plan_with_llm: %s", e, exc_info=True)
 
     return None
 
@@ -449,7 +457,7 @@ async def create_plan(
                     status="executed",
                     payload=params,
                     result=_safe_result(exec_result),
-                    executed_at=datetime.utcnow(),
+                    executed_at=datetime.now(timezone.utc),
                 )
                 db.add(log)
             except Exception as e:

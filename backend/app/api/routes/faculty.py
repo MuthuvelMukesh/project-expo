@@ -3,7 +3,7 @@ CampusIQ — Faculty Routes
 Faculty console endpoints: class analytics, risk roster.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -53,7 +53,7 @@ async def get_risk_roster(
     course_result = await db.execute(select(Course).where(Course.id == course_id))
     course = course_result.scalar_one_or_none()
     if not course:
-        return {"error": "Course not found"}
+        raise HTTPException(status_code=404, detail="Course not found")
 
     students_result = await db.execute(
         select(Student).where(

@@ -1,6 +1,6 @@
 """
 CampusIQ Security Utilities
-Password hashing and JWT token management.
+Password hashing (PBKDF2-SHA256) and JWT token management.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -16,14 +16,12 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    # Truncate password to 72 bytes for bcrypt compatibility
-    password = password[:72]
+    """Hash a password using PBKDF2-SHA256. No length truncation needed."""
     return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    # Truncate password to 72 bytes for bcrypt compatibility
-    plain = plain[:72]
+    """Verify a plaintext password against a PBKDF2-SHA256 hash."""
     return pwd_context.verify(plain, hashed)
 
 
