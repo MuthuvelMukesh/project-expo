@@ -2,18 +2,29 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, BookOpen, Users, BarChart3,
-    GraduationCap, Shield, LogOut, Bot, CalendarCheck
+    GraduationCap, Shield, LogOut, Bot, CalendarCheck, Sparkles,
+    User, Building2, CalendarDays, Download
 } from 'lucide-react';
+import NotificationBell from './NotificationBell';
+import ThemeToggle from './ThemeToggle';
 
 const navConfig = {
     student: [
         { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+        { to: '/profile', icon: User, label: 'My Profile' },
+        { to: '/attendance', icon: CalendarDays, label: 'Attendance' },
+        { to: '/copilot', icon: Sparkles, label: 'AI Copilot' },
     ],
     faculty: [
         { to: '/faculty', icon: BookOpen, label: 'My Classes' },
+        { to: '/copilot', icon: Sparkles, label: 'AI Copilot' },
     ],
     admin: [
         { to: '/admin', icon: Shield, label: 'Admin Panel' },
+        { to: '/manage-users', icon: Users, label: 'Users' },
+        { to: '/manage-courses', icon: BookOpen, label: 'Courses' },
+        { to: '/manage-departments', icon: Building2, label: 'Departments' },
+        { to: '/copilot', icon: Sparkles, label: 'AI Copilot' },
     ],
 };
 
@@ -34,6 +45,10 @@ export default function Sidebar() {
                     <GraduationCap size={22} />
                 </div>
                 <h2>CampusIQ</h2>
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <ThemeToggle />
+                    <NotificationBell />
+                </div>
             </div>
 
             {/* Navigation */}

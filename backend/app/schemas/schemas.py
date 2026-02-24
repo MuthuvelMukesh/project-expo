@@ -215,3 +215,203 @@ class ChatResponse(BaseModel):
     response: str
     sources: Optional[List[str]] = None
     suggested_actions: Optional[List[str]] = None
+
+
+# ─── NLP CRUD ────────────────────────────────────────────────────
+
+class NLPCrudQuery(BaseModel):
+    message: str = Field(..., example="Show all students in Computer Science department")
+    context: Optional[dict] = Field(default=None, example=None)
+
+
+class NLPCrudResponse(BaseModel):
+    intent: str = Field(..., example="READ")
+    entity: str = Field(..., example="Student")
+    result: Optional[dict] = None
+    summary: str = Field(..., example="Found 25 Student records:")
+    row_count: Optional[int] = Field(default=None, example=25)
+    sql_preview: Optional[str] = None
+    error: Optional[str] = None
+
+
+# ─── AI Copilot ──────────────────────────────────────────────────
+
+class CopilotRequest(BaseModel):
+    message: str = Field(..., example="Register 3 new students in Computer Science department")
+
+
+class CopilotAction(BaseModel):
+    action_id: str
+    type: str  # READ, CREATE, UPDATE, DELETE, ANALYZE, NAVIGATE
+    entity: str
+    description: str
+    risk_level: str = "safe"  # safe, low, high
+    requires_confirmation: bool = False
+    params: Optional[dict] = None
+
+
+class CopilotPlan(BaseModel):
+    plan_id: str
+    message: str
+    actions: List[CopilotAction]
+    summary: str
+    requires_confirmation: bool = False
+    auto_executed: Optional[List[dict]] = None
+
+
+class CopilotConfirm(BaseModel):
+    plan_id: str
+    approved_action_ids: List[str] = []
+    rejected_action_ids: List[str] = []
+
+
+class CopilotResult(BaseModel):
+    plan_id: str
+    actions_executed: int = 0
+    actions_failed: int = 0
+    actions_rejected: int = 0
+    results: List[dict] = []
+    summary: str = ""
+
+
+class CopilotHistoryItem(BaseModel):
+    id: int
+    plan_id: str
+    action_type: str
+    entity: str
+    description: str
+    risk_level: str
+    status: str
+    created_at: datetime
+    executed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ─── User Management (Admin) ────────────────────────────────────
+
+class UserManageCreate(BaseModel):
+    email: str
+    password: str = Field(..., min_length=6)
+    full_name: str
+    role: UserRole
+    # Optional profile fields
+    department_id: Optional[int] = None
+    roll_number: Optional[str] = None
+    employee_id: Optional[str] = None
+    semester: Optional[int] = 1
+    section: Optional[str] = "A"
+    designation: Optional[str] = "Assistant Professor"
+
+
+class UserManageUpdate(BaseModel):
+    full_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    department_id: Optional[int] = None
+    semester: Optional[int] = None
+    section: Optional[str] = None
+    designation: Optional[str] = None
+
+
+class UserDetail(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: str
+    is_active: bool
+    created_at: Optional[datetime] = None
+    department_name: Optional[str] = None
+    roll_number: Optional[str] = None
+    employee_id: Optional[str] = None
+    semester: Optional[int] = None
+    section: Optional[str] = None
+    cgpa: Optional[float] = None
+    designation: Optional[str] = None
+
+
+# ─── Course Management ───────────────────────────────────────────
+
+class CourseCreate(BaseModel):
+    code: str
+    name: str
+    department_id: int
+    semester: int
+    credits: int = 3
+    instructor_id: Optional[int] = None
+
+
+class CourseUpdate(BaseModel):
+    name: Optional[str] = None
+    department_id: Optional[int] = None
+    semester: Optional[int] = None
+    credits: Optional[int] = None
+    instructor_id: Optional[int] = None
+
+
+class CourseDetail(BaseModel):
+    id: int
+    code: str
+    name: str
+    department_id: int
+    department_name: Optional[str] = None
+    semester: int
+    credits: int
+    instructor_id: Optional[int] = None
+    instructor_name: Optional[str] = None
+
+
+# ─── Department Management ───────────────────────────────────────
+
+class DepartmentCreate(BaseModel):
+    name: str
+    code: str = Field(..., max_length=10)
+
+
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+
+
+class DepartmentDetail(BaseModel):
+    id: int
+    name: str
+    code: str
+    total_students: int = 0
+    total_faculty: int = 0
+    total_courses: int = 0
+
+
+# ─── Notifications ───────────────────────────────────────────────
+
+class NotificationOut(BaseModel):
+    id: int
+    title: str
+    message: str
+    type: str
+    category: str
+    is_read: bool
+    link: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ─── Student Profile ─────────────────────────────────────────────
+
+class StudentProfileUpdate(BaseModel):
+    section: Optional[str] = None
+    semester: Optional[int] = None
+    department_id: Optional[int] = None
+
+
+# ─── Password Reset ──────────────────────────────────────────────
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)

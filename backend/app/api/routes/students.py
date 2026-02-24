@@ -1,6 +1,6 @@
 """
 CampusIQ — Student Routes
-Student dashboard, attendance, and prediction endpoints.
+Student dashboard, profile, attendance, and prediction endpoints.
 """
 
 from fastapi import APIRouter, Depends
@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.api.dependencies import get_current_user, require_role
-from app.models.models import User, UserRole, Student
+from app.models.models import User, UserRole, Student, Department, Attendance, Course
 from app.schemas.schemas import StudentDashboard, StudentProfileOut
 from app.services.attendance_service import get_student_attendance_summary
 from app.services.prediction_service import predict_student_performance, generate_ai_recommendations
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 router = APIRouter()
 
@@ -69,6 +69,56 @@ async def get_student_dashboard(
     }
 
 
+@router.get("/me/profile")
+async def get_my_profile(
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get student profile with department info."""
+    result = await db.execute(select(Student).where(Student.user_id == current_user.id))
+    student = result.scalar_one_or_none()
+    if not student:
+        return {"error": "Student profile not found"}
+
+    dept = await db.execute(select(Department).where(Department.id == student.department_id))
+    dept_obj = dept.scalar_one_or_none()
+
+    return {
+        "id": student.id,
+        "user_id": current_user.id,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "roll_number": student.roll_number,
+        "department_id": student.department_id,
+        "department_name": dept_obj.name if dept_obj else None,
+        "semester": student.semester,
+        "section": student.section,
+        "cgpa": student.cgpa,
+        "admission_year": student.admission_year,
+    }
+
+
+@router.put("/me/profile")
+async def update_my_profile(
+    data: dict,
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update student's own profile (limited fields)."""
+    result = await db.execute(select(Student).where(Student.user_id == current_user.id))
+    student = result.scalar_one_or_none()
+    if not student:
+        return {"error": "Student profile not found"}
+
+    if "section" in data:
+        student.section = data["section"]
+    if "full_name" in data:
+        current_user.full_name = data["full_name"]
+
+    await db.flush()
+    return {"message": "Profile updated"}
+
+
 @router.get("/me/attendance")
 async def get_my_attendance(
     current_user: User = Depends(require_role(UserRole.STUDENT)),
@@ -83,6 +133,66 @@ async def get_my_attendance(
     return await get_student_attendance_summary(db, student.id)
 
 
+@router.get("/me/attendance/details")
+async def get_my_attendance_details(
+    current_user: User = Depends(require_role(UserRole.STUDENT)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get per-course, per-date attendance records for calendar view."""
+    result = await db.execute(select(Student).where(Student.user_id == current_user.id))
+    student = result.scalar_one_or_none()
+    if not student:
+        return {"error": "Student profile not found"}
+
+    # Get all attendance records
+    stmt = (
+        select(Attendance, Course)
+        .join(Course, Attendance.course_id == Course.id)
+        .where(Attendance.student_id == student.id)
+        .order_by(Attendance.date.desc())
+    )
+    records = await db.execute(stmt)
+    rows = records.all()
+
+    # Group by course
+    by_course = {}
+    all_dates = []
+    for att, course in rows:
+        if course.id not in by_course:
+            by_course[course.id] = {
+                "course_id": course.id,
+                "course_name": course.name,
+                "course_code": course.code,
+                "records": [],
+                "total": 0,
+                "present": 0,
+            }
+        by_course[course.id]["records"].append({
+            "date": att.date.isoformat(),
+            "is_present": att.is_present,
+            "method": att.method,
+        })
+        by_course[course.id]["total"] += 1
+        if att.is_present:
+            by_course[course.id]["present"] += 1
+
+        all_dates.append({
+            "date": att.date.isoformat(),
+            "is_present": att.is_present,
+            "course_code": course.code,
+        })
+
+    # Add percentage
+    for cid in by_course:
+        c = by_course[cid]
+        c["percentage"] = round((c["present"] / c["total"]) * 100, 1) if c["total"] > 0 else 0
+
+    return {
+        "courses": list(by_course.values()),
+        "calendar": all_dates,
+    }
+
+
 @router.get("/me/predictions")
 async def get_my_predictions(
     current_user: User = Depends(require_role(UserRole.STUDENT)),
@@ -95,3 +205,4 @@ async def get_my_predictions(
         return {"error": "Student profile not found"}
 
     return await predict_student_performance(db, student.id)
+

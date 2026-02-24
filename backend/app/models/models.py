@@ -128,3 +128,43 @@ class Prediction(Base):
 
     # Relationships
     student = relationship("Student", back_populates="predictions")
+
+
+class ActionLog(Base):
+    """Audit trail for AI Copilot actions."""
+    __tablename__ = "action_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    plan_id = Column(String(50), nullable=False, index=True)
+    action_id = Column(String(80), nullable=True, index=True)  # e.g. plan_xxx_act_0
+    action_type = Column(String(20), nullable=False)  # READ, CREATE, UPDATE, DELETE, ANALYZE, NAVIGATE
+    entity = Column(String(50), nullable=False)
+    description = Column(Text, nullable=False)
+    risk_level = Column(String(10), default="safe")  # safe, low, high
+    status = Column(String(20), default="pending")  # pending, approved, executed, rejected, failed
+    payload = Column(JSON, default=dict)
+    result = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    executed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    user = relationship("User")
+
+
+class Notification(Base):
+    """User notifications and alerts."""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String(30), default="info")  # info, warning, critical, success
+    category = Column(String(30), default="system")  # attendance, prediction, copilot, system
+    is_read = Column(Boolean, default=False)
+    link = Column(String(255), nullable=True)  # optional navigation link
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")

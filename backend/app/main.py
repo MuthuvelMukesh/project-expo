@@ -40,7 +40,11 @@ async def health_check():
 
 
 # ----- Route Registration -----
-from app.api.routes import auth, students, faculty, attendance, predictions, chatbot, admin
+from app.api.routes import (
+    auth, students, faculty, attendance, predictions,
+    chatbot, admin, nlp_crud, copilot,
+    users, courses, departments, notifications, export,
+)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(students.router, prefix="/api/students", tags=["Students"])
@@ -49,3 +53,10 @@ app.include_router(attendance.router, prefix="/api/attendance", tags=["Attendanc
 app.include_router(predictions.router, prefix="/api/predictions", tags=["Predictions"])
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Chatbot"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(nlp_crud.router, prefix="/api/ai-data", tags=["AI Data Operations"])
+app.include_router(copilot.router, prefix="/api/copilot", tags=["AI Copilot"])
+app.include_router(users.router, prefix="/api/users", tags=["User Management"])
+app.include_router(courses.router, prefix="/api/courses", tags=["Course Management"])
+app.include_router(departments.router, prefix="/api/departments", tags=["Department Management"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notifications"])
+app.include_router(export.router, prefix="/api/export", tags=["Export"])

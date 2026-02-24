@@ -130,6 +130,174 @@ class ApiService {
         });
     }
 
+    // ─── AI Data Operations (NLP CRUD) ──────────────────────
+    async aiDataQuery(message, context = null) {
+        return this.request('/ai-data/query', {
+            method: 'POST',
+            body: JSON.stringify({ message, context }),
+        });
+    }
+
+    // ─── AI Copilot ─────────────────────────────────────────
+    async copilotPlan(message) {
+        return this.request('/copilot/plan', {
+            method: 'POST',
+            body: JSON.stringify({ message }),
+        });
+    }
+
+    async copilotExecute(planId, approvedIds = [], rejectedIds = []) {
+        return this.request('/copilot/execute', {
+            method: 'POST',
+            body: JSON.stringify({
+                plan_id: planId,
+                approved_action_ids: approvedIds,
+                rejected_action_ids: rejectedIds,
+            }),
+        });
+    }
+
+    async copilotHistory() {
+        return this.request('/copilot/history');
+    }
+
+    // ─── User Management (Admin) ─────────────────────────────
+    async listUsers(role = null) {
+        const q = role ? `?role=${role}` : '';
+        return this.request(`/users/${q}`);
+    }
+
+    async createUser(data) {
+        return this.request('/users/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async updateUser(userId, data) {
+        return this.request(`/users/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async toggleUserActive(userId) {
+        return this.request(`/users/${userId}`, { method: 'DELETE' });
+    }
+
+    // ─── Course Management ───────────────────────────────────
+    async listCourses(departmentId = null) {
+        const q = departmentId ? `?department_id=${departmentId}` : '';
+        return this.request(`/courses/${q}`);
+    }
+
+    async createCourse(data) {
+        return this.request('/courses/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async updateCourse(courseId, data) {
+        return this.request(`/courses/${courseId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async deleteCourse(courseId) {
+        return this.request(`/courses/${courseId}`, { method: 'DELETE' });
+    }
+
+    // ─── Department Management ───────────────────────────────
+    async listDepartments() {
+        return this.request('/departments/');
+    }
+
+    async createDepartment(data) {
+        return this.request('/departments/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async updateDepartment(deptId, data) {
+        return this.request(`/departments/${deptId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async deleteDepartment(deptId) {
+        return this.request(`/departments/${deptId}`, { method: 'DELETE' });
+    }
+
+    // ─── Notifications ───────────────────────────────────────
+    async getNotifications(unreadOnly = false) {
+        const q = unreadOnly ? '?unread_only=true' : '';
+        return this.request(`/notifications/${q}`);
+    }
+
+    async getUnreadCount() {
+        return this.request('/notifications/count');
+    }
+
+    async markNotificationRead(notifId) {
+        return this.request(`/notifications/${notifId}/read`, { method: 'PUT' });
+    }
+
+    async markAllNotificationsRead() {
+        return this.request('/notifications/read-all', { method: 'PUT' });
+    }
+
+    // ─── Student Profile ─────────────────────────────────────
+    async getStudentProfile() {
+        return this.request('/students/me/profile');
+    }
+
+    async updateStudentProfile(data) {
+        return this.request('/students/me/profile', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getAttendanceDetails() {
+        return this.request('/students/me/attendance/details');
+    }
+
+    // ─── Password ────────────────────────────────────────────
+    async forgotPassword(email) {
+        return this.request('/auth/forgot-password', {
+            method: 'POST',
+            body: JSON.stringify({ email }),
+        });
+    }
+
+    async resetPassword(token, newPassword) {
+        return this.request('/auth/reset-password', {
+            method: 'POST',
+            body: JSON.stringify({ token, new_password: newPassword }),
+        });
+    }
+
+    async changePassword(oldPassword, newPassword) {
+        return this.request('/auth/change-password', {
+            method: 'PUT',
+            body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+        });
+    }
+
+    // ─── Export ──────────────────────────────────────────────
+    getExportUrl(type, id = null) {
+        const token = this.getToken();
+        const base = '/api/export';
+        if (type === 'students') return `${base}/students?token=${token}`;
+        if (type === 'attendance') return `${base}/attendance/${id}?token=${token}`;
+        if (type === 'risk-roster') return `${base}/risk-roster/${id}?token=${token}`;
+        return base;
+    }
+
     // ─── Utility ─────────────────────────────────────────────
     logout() {
         this.setToken(null);

@@ -26,5 +26,6 @@ async def chat_query(
         message=data.message,
         user_role=current_user.role.value,
         user_id=current_user.id,
+        db=db,
     )
     return ChatResponse(**result)
