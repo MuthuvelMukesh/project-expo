@@ -45,13 +45,30 @@ class ApiService {
             throw new Error('Session expired. Please login again.');
         }
 
-        const data = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        const rawBody = await response.text();
 
-        if (!response.ok) {
-            throw new Error(data.detail || 'Something went wrong');
+        let data = null;
+        if (rawBody && contentType.includes('application/json')) {
+            try {
+                data = JSON.parse(rawBody);
+            } catch {
+                throw new Error('Invalid JSON response from server. Please try again.');
+            }
+        } else if (rawBody) {
+            data = { detail: rawBody };
         }
 
-        return data;
+        if (!response.ok) {
+            const detail =
+                data?.detail ||
+                data?.message ||
+                (rawBody ? rawBody.slice(0, 200) : '') ||
+                'Something went wrong';
+            throw new Error(detail);
+        }
+
+        return data ?? {};
     }
 
     // ─── Auth ────────────────────────────────────────────────

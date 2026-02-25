@@ -3,7 +3,7 @@ CampusIQ — User Management Routes (Admin)
 Full CRUD for users with linked student/faculty profile management.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime
@@ -12,6 +12,7 @@ from app.core.database import get_db
 from app.core.security import hash_password
 from app.api.dependencies import require_role
 from app.models.models import User, UserRole, Student, Faculty, Department
+from app.schemas.schemas import UserManageCreate, UserManageUpdate
 
 router = APIRouter()
 
@@ -75,31 +76,37 @@ async def list_users(
 
 @router.post("/", status_code=201)
 async def create_user(
-    data: dict,
+    data: UserManageCreate,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new user with linked profile."""
     # Check duplicate email
-    existing = await db.execute(select(User).where(User.email == data["email"]))
+    existing = await db.execute(select(User).where(User.email == data.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    role = data.role.value if hasattr(data.role, "value") else str(data.role)
+    dept_id = data.department_id
+    if role in ("student", "faculty") and dept_id is None:
+        dept_result = await db.execute(select(Department).order_by(Department.id).limit(1))
+        default_dept = dept_result.scalar_one_or_none()
+        if not default_dept:
+            raise HTTPException(status_code=400, detail="No departments found. Create a department first")
+        dept_id = default_dept.id
+
     user = User(
-        email=data["email"],
-        hashed_password=hash_password(data["password"]),
-        full_name=data["full_name"],
-        role=data["role"],
+        email=data.email,
+        hashed_password=hash_password(data.password),
+        full_name=data.full_name,
+        role=role,
     )
     db.add(user)
     await db.flush()
     await db.refresh(user)
 
-    role = data["role"]
-    dept_id = data.get("department_id", 1)
-
     if role == "student":
-        roll = data.get("roll_number")
+        roll = data.roll_number
         if not roll:
             count = (await db.execute(select(func.count(Student.id)))).scalar() or 0
             roll = f"STU{datetime.now().year}{count + 1:04d}"
@@ -107,14 +114,14 @@ async def create_user(
             user_id=user.id,
             roll_number=roll,
             department_id=dept_id,
-            semester=data.get("semester", 1),
-            section=data.get("section", "A"),
+            semester=data.semester,
+            section=data.section,
             cgpa=0.0,
             admission_year=datetime.now().year,
         )
         db.add(student)
     elif role == "faculty":
-        emp_id = data.get("employee_id")
+        emp_id = data.employee_id
         if not emp_id:
             count = (await db.execute(select(func.count(Faculty.id)))).scalar() or 0
             emp_id = f"FAC{datetime.now().year}{count + 1:04d}"
@@ -122,7 +129,7 @@ async def create_user(
             user_id=user.id,
             employee_id=emp_id,
             department_id=dept_id,
-            designation=data.get("designation", "Assistant Professor"),
+            designation=data.designation,
         )
         db.add(faculty)
 
@@ -133,7 +140,7 @@ async def create_user(
 @router.put("/{user_id}")
 async def update_user(
     user_id: int,
-    data: dict,
+    data: UserManageUpdate,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
@@ -143,31 +150,33 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if "full_name" in data:
-        user.full_name = data["full_name"]
-    if "is_active" in data:
-        user.is_active = data["is_active"]
+    updates = data.model_dump(exclude_unset=True)
+
+    if "full_name" in updates:
+        user.full_name = updates["full_name"]
+    if "is_active" in updates:
+        user.is_active = updates["is_active"]
 
     # Update linked profile
     if user.role == UserRole.STUDENT or user.role == "student":
         sp = await db.execute(select(Student).where(Student.user_id == user_id))
         student = sp.scalar_one_or_none()
         if student:
-            if "department_id" in data:
-                student.department_id = data["department_id"]
-            if "semester" in data:
-                student.semester = data["semester"]
-            if "section" in data:
-                student.section = data["section"]
+            if "department_id" in updates:
+                student.department_id = updates["department_id"]
+            if "semester" in updates:
+                student.semester = updates["semester"]
+            if "section" in updates:
+                student.section = updates["section"]
 
     elif user.role == UserRole.FACULTY or user.role == "faculty":
         fp = await db.execute(select(Faculty).where(Faculty.user_id == user_id))
         faculty = fp.scalar_one_or_none()
         if faculty:
-            if "department_id" in data:
-                faculty.department_id = data["department_id"]
-            if "designation" in data:
-                faculty.designation = data["designation"]
+            if "department_id" in updates:
+                faculty.department_id = updates["department_id"]
+            if "designation" in updates:
+                faculty.designation = updates["designation"]
 
     await db.flush()
     return {"message": "User updated", "id": user_id}

@@ -10,6 +10,7 @@ from sqlalchemy import select, func
 from app.core.database import get_db
 from app.api.dependencies import require_role, get_current_user
 from app.models.models import User, UserRole, Department, Student, Faculty, Course
+from app.schemas.schemas import DepartmentCreate, DepartmentUpdate
 
 router = APIRouter()
 
@@ -49,16 +50,16 @@ async def list_departments(
 
 @router.post("/", status_code=201)
 async def create_department(
-    data: dict,
+    data: DepartmentCreate,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new department."""
-    existing = await db.execute(select(Department).where(Department.code == data["code"]))
+    existing = await db.execute(select(Department).where(Department.code == data.code))
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail=f"Department code '{data['code']}' already exists")
+        raise HTTPException(status_code=400, detail=f"Department code '{data.code}' already exists")
 
-    dept = Department(name=data["name"], code=data["code"])
+    dept = Department(name=data.name, code=data.code)
     db.add(dept)
     await db.flush()
     await db.refresh(dept)
@@ -69,7 +70,7 @@ async def create_department(
 @router.put("/{dept_id}")
 async def update_department(
     dept_id: int,
-    data: dict,
+    data: DepartmentUpdate,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
@@ -79,10 +80,12 @@ async def update_department(
     if not dept:
         raise HTTPException(status_code=404, detail="Department not found")
 
-    if "name" in data:
-        dept.name = data["name"]
-    if "code" in data:
-        dept.code = data["code"]
+    updates = data.model_dump(exclude_unset=True)
+
+    if "name" in updates:
+        dept.name = updates["name"]
+    if "code" in updates:
+        dept.code = updates["code"]
 
     await db.flush()
     return {"message": "Department updated", "id": dept_id}

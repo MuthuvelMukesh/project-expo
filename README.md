@@ -134,6 +134,12 @@ ollama serve                         # http://localhost:11434
 | Swagger Docs | http://localhost:8000/docs |
 | ReDoc | http://localhost:8000/redoc |
 
+### Frontend API Proxy
+
+- Frontend API base path is `/api`.
+- Vite dev server proxies `/api` using `VITE_API_PROXY_TARGET` (default: `http://localhost:8000`).
+- In Docker Compose, `VITE_API_PROXY_TARGET` is set to `http://backend:8000`.
+
 ---
 
 ## 📂 Project Structure
@@ -174,7 +180,7 @@ project-expo/
 │   │   │   │   ├── chatbot.py       # AI chatbot queries
 │   │   │   │   ├── copilot.py       # AI Copilot plan/execute/history
 │   │   │   │   ├── timetable.py     # NEW: Timetable management
-│   │   │   │   └── notification.py  # System-wide alerts
+│   │   │   │   └── notifications.py # System-wide alerts
 │   │   │   └── dependencies.py      # JWT auth + role guards
 │   │   ├── models/models.py         # SQLAlchemy ORM (10 models)
 │   │   ├── schemas/schemas.py       # Pydantic v2 (50+ schemas)
@@ -225,9 +231,10 @@ XGBoost model predicting final grades with SHAP factors. Automatically flags "At
 ### Timetable
 | Method | Endpoint | Description | Auth |
 |---|---|---|---|
-| GET | `/api/timetable/me` | Get current user's schedule | ✅ |
-| GET | `/api/timetable/department/{id}` | Get department schedule | Admin |
-| POST | `/api/timetable/` | Bulk update schedule | Admin |
+| GET | `/api/timetable/student` | Get current student's timetable | Student |
+| GET | `/api/timetable/faculty` | Get current faculty timetable | Faculty |
+| POST | `/api/timetable/` | Create one timetable slot | Admin |
+| DELETE | `/api/timetable/{slot_id}` | Delete a timetable slot | Admin |
 
 ---
 
@@ -241,7 +248,7 @@ XGBoost model predicting final grades with SHAP factors. Automatically flags "At
 
 ## 📄 License
 
-This project is licensed under the MIT License — see [LICENSE](./LICENSE) for details.
+This project is licensed under the MIT License.
 
 ---
 

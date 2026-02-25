@@ -38,7 +38,12 @@ async def register_user(db: AsyncSession, data: UserCreate) -> UserOut:
         # Get first department as default
         dept_result = await db.execute(select(Department).limit(1))
         default_dept = dept_result.scalar_one_or_none()
-        dept_id = default_dept.id if default_dept else 1
+        if not default_dept:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No departments found. Create a department first",
+            )
+        dept_id = default_dept.id
 
         # Generate roll number
         count_result = await db.execute(select(func.count(Student.id)))
@@ -60,7 +65,12 @@ async def register_user(db: AsyncSession, data: UserCreate) -> UserOut:
     elif data.role == "faculty" or data.role == UserRole.FACULTY:
         dept_result = await db.execute(select(Department).limit(1))
         default_dept = dept_result.scalar_one_or_none()
-        dept_id = default_dept.id if default_dept else 1
+        if not default_dept:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No departments found. Create a department first",
+            )
+        dept_id = default_dept.id
 
         count_result = await db.execute(select(func.count(Faculty.id)))
         count = count_result.scalar() or 0

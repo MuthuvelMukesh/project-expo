@@ -815,7 +815,7 @@ cd campusiq
 docker-compose up -d
 
 # Backend: http://localhost:8000
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:5173
 # API Docs: http://localhost:8000/docs
 # Ollama: http://localhost:11434
 ```

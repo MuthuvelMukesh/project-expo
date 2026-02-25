@@ -119,7 +119,53 @@ User request: "{message}"
 
 Return ONLY a valid JSON array, no other text."""
 
-    try:
+    provider = (settings.LLM_PROVIDER or "ollama").strip().lower()
+
+    async def _parse_actions(content: str) -> Optional[list]:
+        json_match = re.search(r'\[.*\]', content, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group())
+        return None
+
+    async def _plan_via_google() -> Optional[list]:
+        if not settings.GOOGLE_API_KEY:
+            log.warning("Google provider selected but GOOGLE_API_KEY is not set.")
+            return None
+
+        endpoint = (
+            f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
+            f"?key={settings.GOOGLE_API_KEY}"
+        )
+        payload = {
+            "systemInstruction": {
+                "parts": [{"text": "You are a precise JSON-only action planner. Return only valid JSON arrays."}]
+            },
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}],
+                }
+            ],
+            "generationConfig": {"temperature": 0.1},
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(endpoint, json=payload)
+
+        if response.status_code != 200:
+            log.error("Google planner HTTP %s — %s", response.status_code, response.text[:200])
+            return None
+
+        data = response.json()
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return None
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        content = "".join(p.get("text", "") for p in parts)
+        return await _parse_actions(content)
+
+    async def _plan_via_ollama() -> Optional[list]:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{settings.OLLAMA_BASE_URL}/api/chat",
@@ -134,17 +180,28 @@ Return ONLY a valid JSON array, no other text."""
                 },
             )
 
-            if response.status_code == 200:
-                data = response.json()
-                content = data.get("message", {}).get("content", "")
-                json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+        content = data.get("message", {}).get("content", "")
+        return await _parse_actions(content)
+
+    try:
+        if provider == "google":
+            actions = await _plan_via_google()
+            if actions is not None:
+                return actions
+            log.info("Falling back to Ollama planner after Google LLM failure.")
+
+        actions = await _plan_via_ollama()
+        if actions is not None:
+            return actions
 
     except httpx.ConnectError:
-        log.info("Ollama not reachable for copilot action planning — using keyword fallback.")
+        log.info("LLM provider not reachable for copilot action planning — using keyword fallback.")
     except httpx.TimeoutException:
-        log.warning("Ollama timed out during copilot action planning.")
+        log.warning("LLM provider timed out during copilot action planning.")
     except json.JSONDecodeError as e:
         log.warning("Copilot LLM returned invalid JSON: %s", e)
     except Exception as e:

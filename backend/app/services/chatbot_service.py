@@ -192,6 +192,86 @@ Guidelines:
     return None
 
 
+async def _query_google(
+    message: str,
+    user_role: str,
+    user_context: str,
+) -> Optional[str]:
+    """Query Google AI Studio (Gemini) using API key auth."""
+    system_prompt = f"""You are **CampusIQ**, the AI assistant embedded in a college ERP system.
+
+Role of the current user: **{user_role}**
+
+Live data about this user:
+{user_context}
+
+Guidelines:
+- Answer concisely (3-6 sentences max) unless the question needs more detail.
+- When the user asks about *their* attendance, grades, or predictions, use the live data above to give a specific, personalised answer.
+- If the answer is definitively in the live data, reference the exact numbers.
+- If you genuinely don't know something, say so and suggest which dashboard section might help.
+- Use markdown formatting (bold, bullets) for readability.
+- Do NOT make up numbers that are not in the live data section above."""
+
+    if not settings.GOOGLE_API_KEY:
+        log.warning("Google provider selected but GOOGLE_API_KEY is not set.")
+        return None
+
+    endpoint = (
+        f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
+        f"?key={settings.GOOGLE_API_KEY}"
+    )
+
+    try:
+        payload = {
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": message}],
+                }
+            ],
+            "generationConfig": {"temperature": 0.4},
+        }
+
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            resp = await client.post(endpoint, json=payload)
+
+        if resp.status_code != 200:
+            log.error("Google LLM HTTP %s — %s", resp.status_code, resp.text[:200])
+            return None
+
+        data = resp.json()
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return None
+
+        parts = candidates[0].get("content", {}).get("parts", [])
+        content = "".join(p.get("text", "") for p in parts).strip()
+        return content or None
+
+    except httpx.ConnectError:
+        log.info("Google LLM not reachable.")
+    except httpx.TimeoutException:
+        log.warning("Google LLM timed out for: %s", message[:80])
+    except Exception as e:
+        log.error("Unexpected Google LLM error: %s", e, exc_info=True)
+
+    return None
+
+
+async def _query_llm(message: str, user_role: str, user_context: str) -> Optional[str]:
+    provider = (settings.LLM_PROVIDER or "ollama").strip().lower()
+
+    if provider == "google":
+        response = await _query_google(message, user_role, user_context)
+        if response:
+            return response
+        log.info("Falling back to Ollama after Google LLM failure.")
+
+    return await _query_ollama(message, user_role, user_context)
+
+
 # ─── Main entry point ──────────────────────────────────────────
 
 async def process_query(
@@ -241,7 +321,7 @@ async def process_query(
         user_context = await _build_user_context(user_id, user_role, db)
 
     # ── 3.  Ask the LLM with full context ──
-    llm_response = await _query_ollama(message, user_role, user_context)
+    llm_response = await _query_llm(message, user_role, user_context)
     if llm_response:
         return {
             "response": llm_response,

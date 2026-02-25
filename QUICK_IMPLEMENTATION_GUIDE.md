@@ -218,7 +218,7 @@ export default defineConfig({
 import '@testing-library/jest-dom'
 
 // Mock environment
-process.env.VITE_API_URL = 'http://localhost:8000'
+process.env.VITE_API_PROXY_TARGET = 'http://localhost:8000'
 ```
 
 **Create `frontend/src/__tests__/Login.test.jsx`:**

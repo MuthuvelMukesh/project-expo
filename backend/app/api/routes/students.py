@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.api.dependencies import get_current_user, require_role
 from app.models.models import User, UserRole, Student, Department, Attendance, Course
-from app.schemas.schemas import StudentDashboard, StudentProfileOut
+from app.schemas.schemas import StudentProfileUpdate
 from app.services.attendance_service import get_student_attendance_summary
 from app.services.prediction_service import predict_student_performance, generate_ai_recommendations
 from sqlalchemy import select, func
@@ -100,7 +100,7 @@ async def get_my_profile(
 
 @router.put("/me/profile")
 async def update_my_profile(
-    data: dict,
+    data: StudentProfileUpdate,
     current_user: User = Depends(require_role(UserRole.STUDENT)),
     db: AsyncSession = Depends(get_db),
 ):
@@ -110,10 +110,12 @@ async def update_my_profile(
     if not student:
         raise HTTPException(status_code=404, detail="Student profile not found")
 
-    if "section" in data:
-        student.section = data["section"]
-    if "full_name" in data:
-        current_user.full_name = data["full_name"]
+    updates = data.model_dump(exclude_unset=True)
+
+    if "section" in updates:
+        student.section = updates["section"]
+    if "full_name" in updates:
+        current_user.full_name = updates["full_name"]
 
     await db.flush()
     return {"message": "Profile updated"}

@@ -401,6 +401,7 @@ class NotificationOut(BaseModel):
 # ─── Student Profile ─────────────────────────────────────────────
 
 class StudentProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
     section: Optional[str] = None
     semester: Optional[int] = None
     department_id: Optional[int] = None
@@ -414,6 +415,11 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
+    new_password: str = Field(..., min_length=6)
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
     new_password: str = Field(..., min_length=6)
 
 

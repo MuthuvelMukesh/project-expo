@@ -10,6 +10,7 @@ from sqlalchemy import select, func
 from app.core.database import get_db
 from app.api.dependencies import require_role, get_current_user
 from app.models.models import User, UserRole, Course, Department, Faculty
+from app.schemas.schemas import CourseCreate, CourseUpdate
 
 router = APIRouter()
 
@@ -60,23 +61,23 @@ async def list_courses(
 
 @router.post("/", status_code=201)
 async def create_course(
-    data: dict,
+    data: CourseCreate,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new course."""
     # Check duplicate code
-    existing = await db.execute(select(Course).where(Course.code == data["code"]))
+    existing = await db.execute(select(Course).where(Course.code == data.code))
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail=f"Course code '{data['code']}' already exists")
+        raise HTTPException(status_code=400, detail=f"Course code '{data.code}' already exists")
 
     course = Course(
-        code=data["code"],
-        name=data["name"],
-        department_id=data["department_id"],
-        semester=data.get("semester", 1),
-        credits=data.get("credits", 3),
-        instructor_id=data.get("instructor_id"),
+        code=data.code,
+        name=data.name,
+        department_id=data.department_id,
+        semester=data.semester,
+        credits=data.credits,
+        instructor_id=data.instructor_id,
     )
     db.add(course)
     await db.flush()
@@ -88,7 +89,7 @@ async def create_course(
 @router.put("/{course_id}")
 async def update_course(
     course_id: int,
-    data: dict,
+    data: CourseUpdate,
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
@@ -98,9 +99,9 @@ async def update_course(
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    for field in ["name", "department_id", "semester", "credits", "instructor_id"]:
-        if field in data:
-            setattr(course, field, data[field])
+    updates = data.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(course, field, value)
 
     await db.flush()
     return {"message": "Course updated", "id": course_id}

@@ -44,7 +44,25 @@ export default function UserManagement() {
     const handleUpdate = async (userId) => {
         setError(''); setSuccess('');
         try {
-            await api.updateUser(userId, form);
+            const payload = {
+                full_name: form.full_name,
+                is_active: form.is_active,
+            };
+
+            if (form.department_id !== '' && form.department_id !== null && form.department_id !== undefined) {
+                const departmentId = parseInt(form.department_id, 10);
+                if (!Number.isNaN(departmentId)) payload.department_id = departmentId;
+            }
+
+            if (form.semester !== '' && form.semester !== null && form.semester !== undefined) {
+                const semester = parseInt(form.semester, 10);
+                if (!Number.isNaN(semester)) payload.semester = semester;
+            }
+
+            if (form.section) payload.section = form.section;
+            if (form.designation) payload.designation = form.designation;
+
+            await api.updateUser(userId, payload);
             setSuccess('User updated!'); setEditId(null); load();
         } catch (e) { setError(e.message); }
     };

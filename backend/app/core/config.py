@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     # Ollama (Local LLM)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "gemma:2b"
+
+    # LLM Provider (ollama | google)
+    LLM_PROVIDER: str = "ollama"
+    GOOGLE_API_KEY: str = ""
+    GOOGLE_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
+    GOOGLE_MODEL: str = "gemini-1.5-flash"
     
     # ML
     MODEL_PATH: str = "app/ml/models"

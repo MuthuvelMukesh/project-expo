@@ -7,7 +7,7 @@ Quick reference for implementing all optimization strategies.
 ## Phase 1: Critical Database & Connection Optimizations (2-3 hours)
 
 ### Database Indexing
-- [ ] Read [OPTIMIZATION_GUIDE.md](../OPTIMIZATION_GUIDE.md) - Section 1.1
+- [ ] Read [OPTIMIZATION_GUIDE.md](./OPTIMIZATION_GUIDE.md) - Section 1.1
 - [ ] Apply indexes from `backend/alembic_optimization_indexes.py`
   ```bash
   cd backend

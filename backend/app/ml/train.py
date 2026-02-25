@@ -153,7 +153,7 @@ def train_model():
             "cv_r2_std": round(cv_scores.std(), 4),
         },
         "feature_importance": {
-            FEATURE_NAMES.get(k, k): round(v, 4) for k, v in sorted_imp
+            FEATURE_NAMES.get(k, k): round(float(v), 4) for k, v in sorted_imp
         },
         "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }

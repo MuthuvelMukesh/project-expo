@@ -4,6 +4,20 @@
 
 ---
 
+## 🌐 CURRENT PLATFORM BASELINE
+
+Before adding ERP modules, keep these existing runtime defaults aligned:
+
+```
+Frontend URL:         http://localhost:5173
+Backend API:          http://localhost:8000
+Frontend API base:    /api
+Vite proxy env:       VITE_API_PROXY_TARGET (default: http://localhost:8000)
+Docker proxy target:  http://backend:8000
+```
+
+---
+
 ## 📊 At a Glance: Missing vs Complete
 
 ```

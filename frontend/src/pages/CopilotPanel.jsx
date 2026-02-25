@@ -44,6 +44,27 @@ export default function CopilotPanel() {
         } catch { /* ignore */ }
     };
 
+    const extractErrorMessage = (err, fallback) => {
+        if (!err) return fallback;
+
+        const raw =
+            (typeof err === 'string' && err) ||
+            err?.message ||
+            err?.detail ||
+            (typeof err?.toString === 'function' ? err.toString() : '');
+
+        if (!raw) return fallback;
+
+        const normalized = String(raw).trim();
+        if (!normalized) return fallback;
+
+        if (normalized.startsWith('<!DOCTYPE') || normalized.startsWith('<html')) {
+            return 'Server returned HTML instead of JSON. Please verify backend/proxy configuration.';
+        }
+
+        return normalized.length > 260 ? `${normalized.slice(0, 260)}...` : normalized;
+    };
+
     const handlePlan = async () => {
         if (!input.trim() || loading) return;
         setError('');
@@ -65,7 +86,7 @@ export default function CopilotPanel() {
             }
             loadHistory();
         } catch (err) {
-            setError(err.message || 'Failed to create plan');
+            setError(extractErrorMessage(err, 'Failed to create plan'));
         } finally {
             setLoading(false);
         }
@@ -85,7 +106,7 @@ export default function CopilotPanel() {
             setResults(data);
             loadHistory();
         } catch (err) {
-            setError(err.message || 'Failed to execute plan');
+            setError(extractErrorMessage(err, 'Failed to execute plan'));
         } finally {
             setExecuting(false);
         }

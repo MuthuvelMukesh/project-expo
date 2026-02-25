@@ -7,6 +7,27 @@
 
 ---
 
+## 🌐 Current Runtime Baseline
+
+```
+Frontend URL:         http://localhost:5173
+Backend API:          http://localhost:8000
+Frontend API base:    /api
+Vite proxy env:       VITE_API_PROXY_TARGET (default: http://localhost:8000)
+Docker proxy target:  http://backend:8000
+```
+
+Current timetable endpoints:
+
+```
+GET    /api/timetable/student
+GET    /api/timetable/faculty
+POST   /api/timetable/
+DELETE /api/timetable/{slot_id}
+```
+
+---
+
 ## Executive Summary
 
 Your CampusIQ project has a **solid technical foundation** with good core functionality, but needs **critical missing components** before production deployment. This report provides:
