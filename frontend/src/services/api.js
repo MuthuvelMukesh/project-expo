@@ -3,6 +3,14 @@
  * Centralized HTTP client for all backend API calls.
  */
 
+import {
+    buildAuditQuery,
+    buildOperationalDecisionPayload,
+    buildOperationalExecutePayload,
+    buildOperationalPlanPayload,
+    buildOperationalRollbackPayload,
+} from './operationalAI.contract';
+
 const API_BASE = '/api';
 
 class ApiService {
@@ -176,6 +184,56 @@ class ApiService {
 
     async copilotHistory() {
         return this.request('/copilot/history');
+    }
+
+    // ─── Operational AI (Conversational Ops) ────────────────
+    async operationalAIPlan(message, module = 'nlp', clarification = null) {
+        return this.request('/ops-ai/plan', {
+            method: 'POST',
+            body: JSON.stringify(buildOperationalPlanPayload(message, module, clarification)),
+        });
+    }
+
+    async operationalAIDecision({
+        planId,
+        decision,
+        approvedIds = [],
+        rejectedIds = [],
+        comment = null,
+        twoFactorCode = null,
+    }) {
+        return this.request('/ops-ai/decision', {
+            method: 'POST',
+            body: JSON.stringify(
+                buildOperationalDecisionPayload({
+                    planId,
+                    decision,
+                    approvedIds,
+                    rejectedIds,
+                    comment,
+                    twoFactorCode,
+                })
+            ),
+        });
+    }
+
+    async operationalAIExecute(planId) {
+        return this.request('/ops-ai/execute', {
+            method: 'POST',
+            body: JSON.stringify(buildOperationalExecutePayload(planId)),
+        });
+    }
+
+    async operationalAIRollback(executionId) {
+        return this.request('/ops-ai/rollback', {
+            method: 'POST',
+            body: JSON.stringify(buildOperationalRollbackPayload(executionId)),
+        });
+    }
+
+    async operationalAIAudit(filters = {}) {
+        const q = buildAuditQuery(filters);
+        return this.request(`/ops-ai/audit${q ? `?${q}` : ''}`);
     }
 
     // ─── User Management (Admin) ─────────────────────────────

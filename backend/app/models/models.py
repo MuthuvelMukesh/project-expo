@@ -381,3 +381,109 @@ class EmployeeAttendance(Base):
 
     # Relationships
     employee = relationship("Employee")
+
+
+# ─────── CONVERSATIONAL OPERATIONAL AI LAYER ───────────────────
+
+
+class OperationalPlan(Base):
+    """Stored operational plan generated from conversational intent."""
+    __tablename__ = "operational_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_id = Column(String(80), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    module = Column(String(30), nullable=False, default="nlp")
+    message = Column(Text, nullable=False)
+
+    intent_type = Column(String(20), nullable=False)  # READ, CREATE, UPDATE, DELETE, ANALYZE, ESCALATE
+    entity = Column(String(50), nullable=False)
+    filters = Column(JSON, default=dict)
+    scope = Column(JSON, default=dict)
+    affected_fields = Column(JSON, default=list)
+    values = Column(JSON, default=dict)
+
+    confidence = Column(Float, default=0.0)
+    ambiguity = Column(JSON, default=dict)
+    risk_level = Column(String(10), default="LOW")  # LOW, MEDIUM, HIGH
+    estimated_impact_count = Column(Integer, default=0)
+
+    status = Column(String(30), default="draft")
+    requires_confirmation = Column(Boolean, default=False)
+    requires_senior_approval = Column(Boolean, default=False)
+    requires_2fa = Column(Boolean, default=False)
+    escalation_required = Column(Boolean, default=False)
+
+    preview = Column(JSON, default=dict)
+    rollback_plan = Column(JSON, default=dict)
+    error = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class OperationalApprovalDecision(Base):
+    """Approval, rejection, or escalation decisions for a plan."""
+    __tablename__ = "operational_approval_decisions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    plan_id = Column(String(80), ForeignKey("operational_plans.plan_id"), nullable=False, index=True)
+    reviewer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    reviewer_role = Column(String(20), nullable=False)
+    decision = Column(String(20), nullable=False)  # APPROVE, REJECT, ESCALATE
+    approved_scope = Column(JSON, default=dict)
+    rejected_scope = Column(JSON, default=dict)
+    comment = Column(Text, nullable=True)
+    two_factor_verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    reviewer = relationship("User")
+
+
+class OperationalExecution(Base):
+    """Execution records with before/after snapshots for rollback."""
+    __tablename__ = "operational_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    execution_id = Column(String(80), unique=True, nullable=False, index=True)
+    plan_id = Column(String(80), ForeignKey("operational_plans.plan_id"), nullable=False, index=True)
+    executed_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    status = Column(String(20), default="pending")  # pending, executed, failed, rolled_back
+
+    before_state = Column(JSON, default=list)
+    after_state = Column(JSON, default=list)
+    failure_state = Column(JSON, default=dict)
+    rollback_state = Column(JSON, default=dict)
+
+    executed_at = Column(DateTime, nullable=True)
+    rolled_back_at = Column(DateTime, nullable=True)
+
+    executor = relationship("User")
+
+
+class ImmutableAuditLog(Base):
+    """Immutable audit event stream for conversational operations."""
+    __tablename__ = "immutable_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(String(80), unique=True, nullable=False, index=True)
+    plan_id = Column(String(80), nullable=True, index=True)
+    execution_id = Column(String(80), nullable=True, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String(20), nullable=False)
+    module = Column(String(30), nullable=False)
+    operation_type = Column(String(30), nullable=False)
+    event_type = Column(String(30), nullable=False)  # intent_extracted, clarification_required, approved, executed, rollback, failed
+    risk_level = Column(String(10), nullable=False)
+
+    intent_payload = Column(JSON, default=dict)
+    before_state = Column(JSON, default=list)
+    after_state = Column(JSON, default=list)
+    event_metadata = Column("metadata", JSON, default=dict)
+
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")

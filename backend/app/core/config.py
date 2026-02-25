@@ -5,6 +5,7 @@ Loads environment variables and provides app-wide settings.
 
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -32,6 +33,20 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str = ""
     GOOGLE_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
     GOOGLE_MODEL: str = "gemini-1.5-flash"
+
+    # Conversational Ops AI (Gemini key pools)
+    GEMINI_NLP_KEYS: str = ""
+    GEMINI_PREDICTIONS_KEYS: str = ""
+    GEMINI_FINANCE_KEYS: str = ""
+    GEMINI_HR_KEYS: str = ""
+    GEMINI_CHAT_KEYS: str = ""
+    GEMINI_RETRY_ETA_SECONDS: int = 60
+
+    # Conversational Ops Controls
+    OPS_CONFIDENCE_THRESHOLD: float = 0.75
+    OPS_MAX_PREVIEW_ROWS: int = 50
+    OPS_SENIOR_ROLES: str = "admin"
+    OPS_REQUIRE_2FA_HIGH_RISK: bool = True
     
     # ML
     MODEL_PATH: str = "app/ml/models"
@@ -39,6 +54,24 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    @staticmethod
+    def _split_keys(raw: str) -> List[str]:
+        return [item.strip() for item in (raw or "").split(",") if item.strip()]
+
+    @property
+    def GEMINI_KEY_POOLS(self) -> dict[str, List[str]]:
+        return {
+            "nlp": self._split_keys(self.GEMINI_NLP_KEYS),
+            "predictions": self._split_keys(self.GEMINI_PREDICTIONS_KEYS),
+            "finance": self._split_keys(self.GEMINI_FINANCE_KEYS),
+            "hr": self._split_keys(self.GEMINI_HR_KEYS),
+            "chat": self._split_keys(self.GEMINI_CHAT_KEYS),
+        }
+
+    @property
+    def OPS_SENIOR_ROLE_SET(self) -> set[str]:
+        return set(self._split_keys(self.OPS_SENIOR_ROLES))
 
 
 @lru_cache()

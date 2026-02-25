@@ -358,7 +358,102 @@ class CourseDetail(BaseModel):
     semester: int
     credits: int
     instructor_id: Optional[int] = None
-    instructor_name: Optional[str] = None
+
+
+# ─── Conversational Operational AI ─────────────────────────────
+
+class OperationalPlanRequest(BaseModel):
+    message: str
+    module: str = "nlp"
+    clarification: Optional[str] = None
+
+
+class ClarificationPayload(BaseModel):
+    code: str
+    message: str
+    unclear_parts: List[str]
+    question: str
+    confidence: float
+    threshold: float
+
+
+class OperationalPlanResponse(BaseModel):
+    plan_id: str
+    intent: str
+    entity: str
+    confidence: float
+    risk_level: str
+    estimated_impact_count: int
+    requires_confirmation: bool
+    requires_senior_approval: bool
+    requires_2fa: bool
+    status: str
+    clarification: Optional[ClarificationPayload] = None
+    preview: dict
+    auto_execution: Optional[dict] = None
+    ai_service: Optional[dict] = None
+    permission: dict
+
+
+class OperationalDecisionRequest(BaseModel):
+    plan_id: str
+    decision: str  # APPROVE, REJECT, ESCALATE
+    approved_ids: Optional[List[int]] = None
+    rejected_ids: Optional[List[int]] = None
+    comment: Optional[str] = None
+    two_factor_code: Optional[str] = None
+
+
+class OperationalDecisionResponse(BaseModel):
+    plan_id: str
+    status: str
+    decision: str
+    two_factor_verified: bool
+    approved_ids: List[int] = []
+    rejected_ids: List[int] = []
+
+
+class OperationalExecuteRequest(BaseModel):
+    plan_id: str
+
+
+class OperationalExecuteResponse(BaseModel):
+    plan_id: str
+    execution_id: str
+    status: str
+    affected_count: Optional[int] = None
+    before_state: Optional[List[dict]] = None
+    after_state: Optional[List[dict]] = None
+    error: Optional[str] = None
+    alert: Optional[str] = None
+
+
+class OperationalRollbackRequest(BaseModel):
+    execution_id: str
+
+
+class OperationalRollbackResponse(BaseModel):
+    execution_id: str
+    plan_id: Optional[str] = None
+    status: str
+    error: Optional[str] = None
+
+
+class AuditHistoryItem(BaseModel):
+    event_id: str
+    plan_id: Optional[str] = None
+    execution_id: Optional[str] = None
+    user_id: int
+    role: str
+    module: str
+    operation_type: str
+    event_type: str
+    risk_level: str
+    intent_payload: dict
+    before_state: List[dict]
+    after_state: List[dict]
+    metadata: dict
+    created_at: Optional[str] = None
 
 
 # ─── Department Management ───────────────────────────────────────

@@ -44,7 +44,7 @@ from app.api.routes import (
     auth, students, faculty, attendance, predictions,
     chatbot, admin, nlp_crud, copilot,
     users, courses, departments, notifications, export,
-    timetable, finance, hr,
+    timetable, finance, hr, operational_ai,
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -64,4 +64,5 @@ app.include_router(export.router, prefix="/api/export", tags=["Export"])
 app.include_router(timetable.router, prefix="/api/timetable", tags=["Timetable"])
 app.include_router(finance.router, prefix="/api/finance", tags=["Finance"])
 app.include_router(hr.router, prefix="/api/hr", tags=["HR & Payroll"])
+app.include_router(operational_ai.router, prefix="/api/ops-ai", tags=["Operational AI"])
 
