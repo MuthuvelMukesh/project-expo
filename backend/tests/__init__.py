@@ -1,0 +1,3 @@
+"""
+CampusIQ Test Suite
+"""

@@ -184,3 +184,200 @@ class Timetable(Base):
 
     # Relationships
     course = relationship("Course")
+
+
+# ─────── FINANCIAL MANAGEMENT MODULE ─────────────────────────────
+
+
+class FeeStructure(Base):
+    """Fee structure definitions."""
+    __tablename__ = "fee_structures"
+
+    id = Column(Integer, primary_key=True, index=True)
+    semester = Column(Integer, nullable=False)
+    fee_type = Column(String(50), nullable=False)  # tuition, hostel, lab, etc
+    amount = Column(Float, nullable=False)
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class StudentFees(Base):
+    """Student-specific fee records."""
+    __tablename__ = "student_fees"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    fee_type = Column(String(50), nullable=False)
+    amount = Column(Float, nullable=False)
+    due_date = Column(Date, nullable=False)
+    semester = Column(Integer, nullable=False)
+    academic_year = Column(String(10), nullable=False)
+    is_paid = Column(Boolean, default=False)
+    paid_date = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    student = relationship("Student")
+
+
+class Invoice(Base):
+    """Student invoices."""
+    __tablename__ = "invoices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    invoice_number = Column(String(50), unique=True, nullable=False)
+    amount_due = Column(Float, nullable=False)
+    issued_date = Column(Date, nullable=False)
+    due_date = Column(Date, nullable=False)
+    status = Column(String(20), default="issued")  # draft, issued, paid, overdue, cancelled
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    student = relationship("Student")
+    payments = relationship("Payment", back_populates="invoice")
+
+
+class Payment(Base):
+    """Payment records."""
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    payment_date = Column(Date, nullable=False)
+    payment_method = Column(String(50), nullable=False)  # cash, card, bank_transfer
+    reference_number = Column(String(100), unique=True, nullable=True)
+    status = Column(String(20), default="pending")  # pending, verified, reconciled, failed
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    invoice = relationship("Invoice", back_populates="payments")
+    student = relationship("Student")
+
+
+class StudentLedger(Base):
+    """Student financial ledger / account balance tracking."""
+    __tablename__ = "student_ledger"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    transaction_type = Column(String(20), nullable=False)  # debit, credit
+    amount = Column(Float, nullable=False)
+    balance = Column(Float, nullable=False)  # running balance
+    description = Column(String(255), nullable=True)
+    reference_id = Column(Integer, nullable=True)  # invoice or payment ID
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    student = relationship("Student")
+
+
+class FeeWaiver(Base):
+    """Fee waivers, scholarships, and discounts."""
+    __tablename__ = "fee_waivers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
+    waiver_type = Column(String(50), nullable=False)  # scholarship, discount, exemption
+    amount = Column(Float, nullable=False)
+    percentage = Column(Float, nullable=True)  # if percentage-based
+    reason = Column(Text, nullable=True)
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # admin
+    from_date = Column(Date, nullable=False)
+    to_date = Column(Date, nullable=True)
+    status = Column(String(20), default="active")  # active, expired, cancelled
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    student = relationship("Student")
+    approved_user = relationship("User")
+
+
+# ─────── HR & PAYROLL MODULE ────────────────────────────────────
+
+
+class Employee(Base):
+    """Extended employee information for HR module."""
+    __tablename__ = "employees"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    employee_type = Column(String(50), nullable=False)  # faculty, staff, admin
+    date_of_joining = Column(Date, nullable=False)
+    date_of_birth = Column(Date, nullable=True)
+    phone = Column(String(20), nullable=True)
+    address = Column(Text, nullable=True)
+    city = Column(String(100), nullable=True)
+    state = Column(String(100), nullable=True)
+    bank_account = Column(String(50), nullable=True)
+    bank_name = Column(String(100), nullable=True)
+    ifsc_code = Column(String(20), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+    salary_records = relationship("SalaryRecord", back_populates="employee")
+
+
+class SalaryStructure(Base):
+    """Salary structure definitions."""
+    __tablename__ = "salary_structures"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    designation = Column(String(100), nullable=False)
+    base_salary = Column(Float, nullable=False)
+    da = Column(Float, default=0)  # Dearness Allowance
+    hra = Column(Float, default=0)  # House Rent Allowance
+    other_allowances = Column(Float, default=0)
+    pf_contribution = Column(Float, default=0)  # Provident Fund
+    insurance = Column(Float, default=0)
+    tax_rate = Column(Float, default=0)
+    effective_from = Column(Date, nullable=False)
+    effective_to = Column(Date, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+
+
+class SalaryRecord(Base):
+    """Salary payment records."""
+    __tablename__ = "salary_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    month = Column(Integer, nullable=False)  # 1-12
+    year = Column(Integer, nullable=False)
+    gross_salary = Column(Float, nullable=False)
+    deductions = Column(Float, nullable=False)
+    net_salary = Column(Float, nullable=False)
+    payment_date = Column(Date, nullable=True)
+    status = Column(String(20), default="pending")  # pending, processed, paid, failed
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee", back_populates="salary_records")
+
+
+class EmployeeAttendance(Base):
+    """Extended employee attendance."""
+    __tablename__ = "employee_attendance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    check_in = Column(String(5), nullable=True)  # "09:30"
+    check_out = Column(String(5), nullable=True)  # "17:30"
+    hours_worked = Column(Float, nullable=True)
+    status = Column(String(20), default="present")  # present, absent, halfday, leave
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
