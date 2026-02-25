@@ -1,0 +1,324 @@
+/* Finance Module Styles */
+
+.finance-dashboard,
+.fee-structure-form,
+.payment-form,
+.invoice-list {
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.finance-dashboard h2,
+.fee-structure-form h3,
+.payment-form h3,
+.invoice-list h3 {
+  color: var(--text-primary, #333);
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--primary-color, #007bff);
+  padding-bottom: 10px;
+}
+
+/* Dashboard Grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid var(--primary-color, #007bff);
+}
+
+.balance-card .balance-amount {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--primary-color, #007bff);
+  margin: 15px 0;
+}
+
+.balance-card .balance-label {
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+}
+
+.actions-card .action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* Forms */
+.fee-structure-form form,
+.payment-form form,
+.invoice-list form {
+  display: grid;
+  gap: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary, #333);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #007bff);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+/* Tables */
+.fees-table table,
+.payments-table table,
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+table thead {
+  background: var(--table-header-bg, #f0f0f0);
+  border-bottom: 2px solid var(--border-color, #ddd);
+}
+
+table th {
+  padding: 12px 15px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--border-color, #ddd);
+}
+
+table tbody tr:hover {
+  background: var(--row-hover-bg, #f9f9f9);
+}
+
+.amount {
+  font-weight: 600;
+  color: var(--primary-color, #007bff);
+}
+
+.overdue {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status.verified,
+.status.paid,
+.status.reconciled {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status.pending,
+.status.draft,
+.status.issued {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status.failed,
+.status.cancelled,
+.status.overdue {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* Buttons */
+.btn-primary,
+.btn-secondary,
+.btn-small {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary-color, #007bff);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+  box-shadow: 0 2px 8px rgba(0, 86, 179, 0.3);
+}
+
+.btn-primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--secondary-color, #6c757d);
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #545b62;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+  margin-right: 5px;
+}
+
+.btn-small.btn-info {
+  background: #17a2b8;
+  color: white;
+}
+
+.btn-small.btn-info:hover {
+  background: #138496;
+}
+
+.btn-filter {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-filter.active {
+  background: var(--primary-color, #007bff);
+  color: white;
+  border-color: var(--primary-color, #007bff);
+}
+
+/* Messages */
+.error-message {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 4px solid #dc3545;
+}
+
+.success-message {
+  background: #d4edda;
+  color: #155724;
+  padding: 12px 15px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 4px solid #28a745;
+}
+
+/* Loading and Empty States */
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: var(--text-secondary, #666);
+  font-size: 16px;
+}
+
+.text-center {
+  text-align: center;
+  color: var(--text-secondary, #666);
+}
+
+.dashboard-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  table {
+    font-size: 12px;
+  }
+
+  table th,
+  table td {
+    padding: 8px 10px;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-buttons {
+    width: 100%;
+  }
+
+  .btn-filter {
+    flex: 1;
+  }
+}

@@ -321,6 +321,139 @@ class ApiService {
     createTimetableSlot(data) { return this.request('/timetable/', { method: 'POST', body: JSON.stringify(data) }); }
     deleteTimetableSlot(id) { return this.request(`/timetable/${id}`, { method: 'DELETE' }); }
 
+    // ─── Financial Management ──────────────────────────────────
+    async createFeeStructure(data) {
+        return this.request('/finance/fee-structures', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async listFeeStructures() {
+        return this.request('/finance/fee-structures');
+    }
+
+    async getStudentBalance(studentId) {
+        return this.request(`/finance/student-balance/${studentId}`);
+    }
+
+    async createInvoice(studentId) {
+        return this.request(`/finance/invoices/generate/${studentId}`, {
+            method: 'POST',
+        });
+    }
+
+    async getInvoices(studentId = null) {
+        const q = studentId ? `?student_id=${studentId}` : '';
+        return this.request(`/finance/invoices${q}`);
+    }
+
+    async recordPayment(data) {
+        return this.request('/finance/payments', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getPayments(invoiceId = null) {
+        const q = invoiceId ? `?invoice_id=${invoiceId}` : '';
+        return this.request(`/finance/payments${q}`);
+    }
+
+    async getFinanceReports(reportType) {
+        // reportType: 'outstanding', 'collection', 'revenue'
+        return this.request(`/finance/reports/${reportType}`);
+    }
+
+    async verifyPayment(paymentId) {
+        return this.request(`/finance/payments/${paymentId}/verify`, {
+            method: 'PUT',
+        });
+    }
+
+    // ─── HR & Payroll Management ───────────────────────────────
+    async createEmployee(data) {
+        return this.request('/hr/employees', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async listEmployees() {
+        return this.request('/hr/employees');
+    }
+
+    async getEmployeeDetails(employeeId) {
+        return this.request(`/hr/employees/${employeeId}`);
+    }
+
+    async updateEmployee(employeeId, data) {
+        return this.request(`/hr/employees/${employeeId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async createSalaryStructure(data) {
+        return this.request('/hr/salary-structures', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getSalaryStructure(employeeId) {
+        return this.request(`/hr/salary-structures/${employeeId}`);
+    }
+
+    async updateSalaryStructure(structureId, data) {
+        return this.request(`/hr/salary-structures/${structureId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async processSalary(data) {
+        // body: { employee_id, month, year }
+        return this.request('/hr/salary-records/process', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getSalaryRecords(employeeId = null) {
+        const q = employeeId ? `?employee_id=${employeeId}` : '';
+        return this.request(`/hr/salary-records${q}`);
+    }
+
+    async getSalarySlip(recordId) {
+        return this.request(`/hr/salary-records/${recordId}/slip`);
+    }
+
+    async markSalaryPaid(recordId) {
+        return this.request(`/hr/salary-records/${recordId}/pay`, {
+            method: 'POST',
+        });
+    }
+
+    async getPayrollReport(reportType, month = null, year = null) {
+        // reportType: 'summary', 'slip'
+        const q = (month || year) ? `?${month ? `month=${month}` : ''}${year ? `&year=${year}` : ''}` : '';
+        return this.request(`/hr/reports/${reportType}${q}`);
+    }
+
+    async recordEmployeeAttendance(data) {
+        // body: { employee_id, date, check_in, check_out, hours_worked }
+        return this.request('/hr/attendance', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getEmployeeAttendance(employeeId, month = null, year = null) {
+        const q = (month || year) ? `?${month ? `month=${month}` : ''}${year ? `&year=${year}` : ''}` : '';
+        return this.request(`/hr/attendance/${employeeId}${q}`);
+    }
+
     // ─── Utility ─────────────────────────────────────────────
     logout() {
         this.setToken(null);

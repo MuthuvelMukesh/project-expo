@@ -1,0 +1,143 @@
+/* Finance & HR Management Page Styles */
+
+.finance-management-page,
+.hr-management-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.page-header {
+  margin-bottom: 30px;
+  border-bottom: 2px solid var(--border-color, #ddd);
+  padding-bottom: 20px;
+}
+
+.page-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary, #333);
+  margin: 0 0 10px 0;
+}
+
+.page-header .subtitle {
+  font-size: 16px;
+  color: var(--text-secondary, #666);
+  margin: 0;
+}
+
+/* Tab Navigation */
+.tab-navigation {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-color, #ddd);
+}
+
+.tab-btn {
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+  margin-bottom: -1px;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary, #333);
+  background: var(--bg-hover, #f9f9f9);
+}
+
+.tab-btn.active {
+  color: var(--primary-color, #007bff);
+  border-bottom-color: var(--primary-color, #007bff);
+}
+
+/* Tab Content */
+.tab-content {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Access Denied */
+.access-denied {
+  background: white;
+  border-radius: 8px;
+  padding: 60px 20px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.access-denied h2 {
+  font-size: 28px;
+  color: #dc3545;
+  margin-bottom: 10px;
+}
+
+.access-denied p {
+  font-size: 16px;
+  color: var(--text-secondary, #666);
+  margin: 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .finance-management-page,
+  .hr-management-page {
+    padding: 10px;
+  }
+
+  .page-header h1 {
+    font-size: 24px;
+  }
+
+  .page-header .subtitle {
+    font-size: 14px;
+  }
+
+  .tab-navigation {
+    gap: 5px;
+  }
+
+  .tab-btn {
+    padding: 10px 15px;
+    font-size: 13px;
+  }
+}
+
+/* Card styling for consistency */
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+/* Print Styles */
+@media print {
+  .tab-navigation,
+  .page-header {
+    display: none;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+}

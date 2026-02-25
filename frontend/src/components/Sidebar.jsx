@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, BookOpen, Users, BarChart3,
     GraduationCap, Shield, LogOut, Bot, CalendarCheck, Sparkles,
-    User, Building2, CalendarDays, Download
+    User, Building2, CalendarDays, Download, DollarSign, Briefcase
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
@@ -14,6 +14,7 @@ const navConfig = {
         { to: '/timetable', icon: CalendarCheck, label: 'Timetable' },
         { to: '/profile', icon: User, label: 'My Profile' },
         { to: '/attendance', icon: CalendarDays, label: 'Attendance' },
+        { to: '/finance', icon: DollarSign, label: 'Fees & Payments' },
         { to: '/copilot', icon: Sparkles, label: 'AI Copilot' },
     ],
     faculty: [
@@ -26,6 +27,8 @@ const navConfig = {
         { to: '/manage-users', icon: Users, label: 'Users' },
         { to: '/manage-courses', icon: BookOpen, label: 'Courses' },
         { to: '/manage-departments', icon: Building2, label: 'Departments' },
+        { to: '/finance', icon: DollarSign, label: 'Finance' },
+        { to: '/hr', icon: Briefcase, label: 'HR & Payroll' },
         { to: '/copilot', icon: Sparkles, label: 'AI Copilot' },
     ],
 };
