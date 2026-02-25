@@ -39,14 +39,18 @@ services:
       DATABASE_URL: postgresql+asyncpg://campusiq:campusiq_secret@db:5432/campusiq
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: campusiq-hackathon-secret-key-change-in-production
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+      # Google Gemini — primary key
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GOOGLE_BASE_URL: ${GOOGLE_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
       GOOGLE_MODEL: ${GOOGLE_MODEL:-gemini-1.5-flash}
+      # Per-module Gemini key pools
+      GEMINI_NLP_KEYS: ${GEMINI_NLP_KEYS:-}
+      GEMINI_PREDICTIONS_KEYS: ${GEMINI_PREDICTIONS_KEYS:-}
+      GEMINI_FINANCE_KEYS: ${GEMINI_FINANCE_KEYS:-}
+      GEMINI_HR_KEYS: ${GEMINI_HR_KEYS:-}
+      GEMINI_CHAT_KEYS: ${GEMINI_CHAT_KEYS:-}
+      GEMINI_RETRY_ETA_SECONDS: ${GEMINI_RETRY_ETA_SECONDS:-60}
       MODEL_PATH: app/ml/models
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
     depends_on:
@@ -77,15 +81,5 @@ services:
       - /app/node_modules
     command: npm run dev -- --host 0.0.0.0 --port 5173
 
-  # ── Ollama (Local LLM) ─────────────────────
-  ollama:
-    image: ollama/ollama:latest
-    container_name: campusiq-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-
 volumes:
   postgres_data:
-  ollama_data:

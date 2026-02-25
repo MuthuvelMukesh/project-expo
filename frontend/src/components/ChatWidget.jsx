@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Send, X, Bot, Sparkles, Database } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { MessageCircle, Send, X, Sparkles, Terminal, Zap } from 'lucide-react';
 import api from '../services/api';
 
 // Parse markdown-like text with bold, newlines, bullet points, and tables
@@ -74,11 +75,13 @@ function formatMarkdown(text) {
 }
 
 export default function ChatWidget() {
+    const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     const [messages, setMessages] = useState([
         {
             role: 'bot',
-            text: "👋 Hi! I'm **CampusIQ AI**. I can help with attendance, predictions, grades — and now you can **query & manage data** using natural language!\n\nTry: *\"Show all students\"* or *\"How many courses in CS?\"*",
+            text: "👋 Hi! I'm **CampusIQ AI** powered by Gemini.\n\nI can answer questions about attendance, grades, and predictions.\n\nFor data operations (create, update, delete records) use the **Command Console** — it gives you full risk review and audit trail.",
+            actions: ['What is my attendance?', 'Show my predictions', 'Open Command Console'],
         },
     ]);
     const [input, setInput] = useState('');
@@ -128,6 +131,11 @@ export default function ChatWidget() {
     };
 
     const handleActionClick = (action) => {
+        if (action === 'Open Command Console') {
+            setOpen(false);
+            navigate('/copilot');
+            return;
+        }
         setInput(action);
     };
 
@@ -145,8 +153,8 @@ export default function ChatWidget() {
                             borderRadius: 8,
                             marginLeft: 8,
                         }}>
-                            <Database size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
-                            NLP
+                            <Zap size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                            Gemini
                         </span>
                         <button
                             onClick={() => setOpen(false)}
@@ -162,23 +170,32 @@ export default function ChatWidget() {
                                 <span dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.text) }} />
                                 {msg.actions && msg.actions.length > 0 && (
                                     <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                        {msg.actions.map((action, j) => (
-                                            <button
-                                                key={j}
-                                                onClick={() => handleActionClick(action)}
-                                                style={{
-                                                    padding: '4px 10px',
-                                                    fontSize: '0.7rem',
-                                                    background: 'rgba(108, 99, 255, 0.2)',
-                                                    border: '1px solid rgba(108, 99, 255, 0.3)',
-                                                    borderRadius: 12,
-                                                    color: '#8B83FF',
-                                                    cursor: 'pointer',
-                                                }}
-                                            >
-                                                {action}
-                                            </button>
-                                        ))}
+                                        {msg.actions.map((action, j) => {
+                                            const isConsole = action === 'Open Command Console';
+                                            return (
+                                                <button
+                                                    key={j}
+                                                    onClick={() => handleActionClick(action)}
+                                                    style={{
+                                                        padding: '4px 10px',
+                                                        fontSize: '0.7rem',
+                                                        background: isConsole
+                                                            ? 'rgba(124, 58, 237, 0.25)'
+                                                            : 'rgba(108, 99, 255, 0.2)',
+                                                        border: `1px solid ${isConsole ? 'rgba(124,58,237,0.5)' : 'rgba(108, 99, 255, 0.3)'}`,
+                                                        borderRadius: 12,
+                                                        color: isConsole ? '#A78BFA' : '#8B83FF',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 4,
+                                                    }}
+                                                >
+                                                    {isConsole && <Terminal size={10} />}
+                                                    {action}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

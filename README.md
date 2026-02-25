@@ -1,36 +1,34 @@
-# 🎓 CampusIQ — AI-First Intelligent College ERP
+# CampusIQ — AI-First Intelligent College ERP
 
-> An autonomous, AI-powered campus management system that **predicts**, **adapts**, and **automates** — turning raw campus data into intelligent decisions.
+> An autonomous, AI-powered campus management system that **predicts**, **adapts**, and **automates** — turning raw campus data into intelligent decisions through natural language.
 
 ![Status](https://img.shields.io/badge/status-hackathon%20MVP-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![AI](https://img.shields.io/badge/AI-XGBoost%20%2B%20SHAP-purple)
 ![Stack](https://img.shields.io/badge/stack-React%20%2B%20FastAPI-orange)
-![LLM](https://img.shields.io/badge/LLM-Gemma%20via%20Ollama-teal)
+![LLM](https://img.shields.io/badge/LLM-Google%20Gemini-blue)
 
 ---
 
-## 🚀 What is CampusIQ?
+## What is CampusIQ?
 
-CampusIQ is an **AI-first college ERP** that replaces reactive, manual campus management with intelligent, predictive automation. Unlike traditional ERPs that simply store data, CampusIQ **learns from it** — predicting student outcomes, flagging at-risk students, automating attendance, and powering a natural-language AI Copilot that lets users manage the entire system through conversation.
+CampusIQ is an **AI-first college ERP** that replaces form-driven campus management with intelligent, conversational automation. Users manage the entire system through natural language — the AI classifies intent, assesses risk, enforces approval, executes securely, and maintains a full audit trail.
 
-### Key Innovations
+### Key Capabilities
 
-| Feature | What Makes It Different |
+| Feature | Description |
 |---|---|
-| 🤖 **AI Copilot** | Natural language operations — manage the entire ERP through conversation |
-| 🔮 **Grade Prediction** | XGBoost predicts exam grades 4–6 weeks before exams |
-| 📅 **AI Timetable** | Intelligent schedule viewer with course details and faculty info |
-| 💬 **NLP CRUD Engine** | "Show all CSE students in semester 5" → instant database query |
-| 📊 **Explainable AI** | Every prediction shows _why_ via SHAP factor analysis |
-| ✅ **Smart Attendance** | QR-based, time-limited, with anti-fraud validation |
-| 🎯 **Risk Alerts** | Auto-flags at-risk students for faculty and admin |
-| 🌗 **Theme Toggle** | Dark/light mode with localStorage persistence |
-| 🔒 **Security-First** | PBKDF2-SHA256 hashing, no-leak error handling, and 100% on-premise |
+| **Command Console** | NL → structured plan → risk review → human-in-the-loop approval → execution → rollback |
+| **Governance Dashboard** | Admin oversight: pending approvals, live stats, risk distribution, full audit trail |
+| **Grade Prediction** | XGBoost predicts exam grades 4–6 weeks ahead with SHAP explainability |
+| **NLP CRUD Engine** | "Show all CSE students in semester 5" → instant database query |
+| **Context-Aware Chatbot** | Gemini-powered assistant injecting live attendance, CGPA, and predictions into context |
+| **Smart Attendance** | QR-based, time-limited, single-use, with anti-fraud validation |
+| **Risk Alerts** | Auto-flags at-risk students for faculty and admin |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌───────────────────┐
@@ -39,93 +37,117 @@ CampusIQ is an **AI-first college ERP** that replaces reactive, manual campus ma
 └─────────────────┘     └──────────────────┘     └───────────────────┘
                                 │                        │
                          ┌──────┴──────┐          ┌──────┴──────┐
-                         │ PostgreSQL  │          │ Ollama LLM  │
-                         │ + Redis     │          │ (Gemma 2B)  │
+                         │ PostgreSQL  │          │   Gemini    │
+                         │ + Redis     │          │ Key  Pool   │
                          └─────────────┘          └─────────────┘
 ```
 
 ### AI Stack
 
-| Component | Role | Fallback |
+| Component | Engine | Fallback |
 |---|---|---|
-| **AI Copilot** | Multi-step action planning from natural language | Keyword-based planner |
-| **NLP CRUD Engine** | Intent detection + entity extraction for DB ops | Regex-based classifier |
-| **AI Chatbot** | Context-aware Q&A using live student/faculty data | Rule-based knowledge base |
-| **Prediction Engine** | XGBoost grade prediction + SHAP explainability | — |
+| **Command Console** | Gemini (`nlp` pool) — action planning + risk classification | Keyword-based planner |
+| **NLP CRUD Engine** | Gemini (`nlp` pool) — intent detection + entity extraction | Regex-based classifier |
+| **AI Chatbot** | Gemini (`chat` pool) — context-aware conversational Q&A | Rule-based knowledge base |
+| **Prediction Engine** | XGBoost + SHAP (local model, no API needed) | — |
 
-> All AI features use the **Ollama** local LLM (default: `gemma:2b`). The chatbot is now **context-aware**, automatically injecting user data (attendance, CGPA, predictions) into prompts for personalized advice.
-
-**Full architecture**: [CAMPUSIQ_ARCHITECTURE.md](./CAMPUSIQ_ARCHITECTURE.md)
+All LLM calls route through `GeminiPoolClient` — a module-isolated key pool with automatic retry/failover across keys. If Gemini is unavailable, every AI feature gracefully falls back to keyword/rule-based logic so the ERP stays functional.
 
 ---
 
-## 📦 Tech Stack
+## Tech Stack
 
 | Layer | Technologies |
 |---|---|
 | **Frontend** | React 18, Vite 5, Recharts, Lucide Icons, React Router v6 |
 | **Backend** | Python 3.11, FastAPI, SQLAlchemy 2.0 (async), Pydantic v2 |
-| **Database** | PostgreSQL 16, Redis 7 (caching) |
-| **AI/ML** | XGBoost, SHAP, scikit-learn, pandas, numpy |
-| **LLM** | Ollama (Gemma 2B / 7B / 9B), httpx |
+| **Database** | PostgreSQL 16, Redis 7 |
+| **AI/ML** | XGBoost, SHAP, scikit-learn, pandas |
+| **LLM** | Google Gemini (`gemini-1.5-flash`) via per-module key pools |
 | **DevOps** | Docker, Docker Compose |
 | **Auth** | JWT (python-jose), PBKDF2-SHA256 (passlib) |
 
 ---
 
-## 🚀 Quick Start
+## Gemini API Key Setup
+
+CampusIQ uses Google Gemini exclusively for all LLM features. You need at least one API key.
+
+### Get a free key
+
+1. Go to **https://aistudio.google.com/app/apikey**
+2. Sign in with a Google account
+3. Click **Create API key** → copy it
+
+Free tier gives 15 requests/minute and 1 million tokens/day per key — enough for development and demos.
+
+### How the key pool works
+
+CampusIQ splits LLM calls across five isolated module pools:
+
+| Pool variable | Used by |
+|---|---|
+| `GEMINI_NLP_KEYS` | Command Console planner + NLP CRUD engine |
+| `GEMINI_CHAT_KEYS` | AI Chatbot |
+| `GEMINI_PREDICTIONS_KEYS` | Grade prediction explanations |
+| `GEMINI_FINANCE_KEYS` | Finance module queries |
+| `GEMINI_HR_KEYS` | HR / payroll module queries |
+
+**Each pool is a comma-separated list of keys.** When one key hits the rate limit, the next key in the list is tried automatically. If a pool is empty, the fallback `GOOGLE_API_KEY` is used.
+
+**Minimum setup (1 key):**
+```env
+GOOGLE_API_KEY=AIza...your-key-here
+```
+
+**Recommended setup (2–3 keys for demo/presentation):**
+```env
+GOOGLE_API_KEY=AIza...key1          # primary fallback
+GEMINI_NLP_KEYS=AIza...key1,AIza...key2,AIza...key3
+GEMINI_CHAT_KEYS=AIza...key1,AIza...key2
+```
+
+Using separate keys per module means Command Console queries don't consume the chatbot's quota and vice versa — no request will ever fail from rate limiting during a demo.
+
+---
+
+## Quick Start
 
 ### Option 1: Docker Compose (Recommended)
 
+**Step 1 — Set your API key**
+
 ```bash
-git clone https://github.com/MuthuvelMukesh/project-expo.git
+cd project-expo/backend
+cp .env.example .env
+```
+
+Open `.env` and set at minimum:
+```env
+GOOGLE_API_KEY=AIza...your-key-here
+```
+
+Optionally add more keys per module for better throughput:
+```env
+GEMINI_NLP_KEYS=AIza...key1,AIza...key2
+GEMINI_CHAT_KEYS=AIza...key1,AIza...key2
+```
+
+**Step 2 — Start everything**
+
+```bash
 cd project-expo
 docker-compose up -d
 ```
 
-This starts **5 services**: PostgreSQL, Redis, Backend API, Frontend, and Ollama LLM.  
-The backend auto-seeds demo data and the ML model is pre-trained at build time.
+This starts **4 services**: PostgreSQL, Redis, Backend API, and React Frontend.
 
-### Option 2: Local Development
+The backend automatically:
+- Creates all database tables
+- Seeds demo users, students, faculty, courses, departments, attendance, and predictions
+- Trains the XGBoost ML model (at build time)
 
-```bash
-# 1. Start PostgreSQL & Redis (via Docker or local install)
-docker-compose up -d db redis
-
-# 2. Backend
-cd backend
-cp .env.example .env                 # configure environment
-python -m venv venv
-venv\Scripts\activate                # Windows
-pip install -r requirements.txt
-
-# Train ML model
-python -m app.ml.seed_data           # generate synthetic training CSV
-python -m app.ml.train               # train XGBoost → saves .joblib
-
-# Seed database & start server
-python -m app.seed                   # populate PostgreSQL with demo data (Timetable, Users, etc.)
-uvicorn app.main:app --reload        # http://localhost:8000
-
-# 3. Frontend (new terminal)
-cd frontend
-npm install
-npm run dev                          # http://localhost:5173
-
-# 4. Ollama (optional — for AI features)
-ollama pull gemma:2b                 # or gemma2:9b for better accuracy
-ollama serve                         # http://localhost:11434
-```
-
-### 🔑 Demo Accounts
-
-| Role | Email | Password |
-|---|---|---|
-| 🔑 Admin | `admin@campusiq.edu` | `admin123` |
-| 👨‍🏫 Faculty | `faculty1@campusiq.edu` | `faculty123` |
-| 👨‍🎓 Student | `student1@campusiq.edu` | `student123` |
-
-### Access Points
+**Step 3 — Access the app**
 
 | Service | URL |
 |---|---|
@@ -134,123 +156,161 @@ ollama serve                         # http://localhost:11434
 | Swagger Docs | http://localhost:8000/docs |
 | ReDoc | http://localhost:8000/redoc |
 
-### Frontend API Proxy
+---
 
-- Frontend API base path is `/api`.
-- Vite dev server proxies `/api` using `VITE_API_PROXY_TARGET` (default: `http://localhost:8000`).
-- In Docker Compose, `VITE_API_PROXY_TARGET` is set to `http://backend:8000`.
+### Option 2: Local Development
+
+**Prerequisites:** Python 3.11+, Node.js 18+, PostgreSQL 16, Redis 7
+
+**Step 1 — Infrastructure**
+
+```bash
+# Start only the databases (PostgreSQL + Redis)
+docker-compose up -d db redis
+```
+
+**Step 2 — Backend**
+
+```bash
+cd backend
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env — set GOOGLE_API_KEY at minimum (see Key Setup section above)
+
+# Create virtual environment
+python -m venv venv
+
+# Activate (Windows)
+venv\Scripts\activate
+# Activate (macOS/Linux)
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Train the ML model (one-time setup)
+python -m app.ml.seed_data       # generates synthetic training CSV
+python -m app.ml.train           # trains XGBoost model → saves .joblib files
+
+# Seed the database with demo data
+python -m app.seed_db
+
+# Start the API server
+uvicorn app.main:app --reload    # runs at http://localhost:8000
+```
+
+**Step 3 — Frontend**
+
+```bash
+# Open a new terminal
+cd frontend
+
+npm install
+npm run dev                      # runs at http://localhost:5173
+```
 
 ---
 
-## 📂 Project Structure
+## Demo Accounts
+
+| Role | Email | Password | Access |
+|---|---|---|---|
+| Admin | `admin@campusiq.edu` | `admin123` | Full access + Command Console + Governance |
+| Faculty | `faculty1@campusiq.edu` | `faculty123` | Courses, attendance, risk roster |
+| Student | `student1@campusiq.edu` | `student123` | Dashboard, predictions, attendance |
+
+---
+
+## How the Command Console Works
+
+1. **Type a natural language command** — e.g. *"Show all students in Computer Science with CGPA below 6"*
+2. **AI planning** — Gemini parses intent, entity, and filters into a structured action plan (falls back to keyword parsing if Gemini is unavailable)
+3. **Risk classification** — every action is rated LOW / MEDIUM / HIGH
+   - `LOW` (READ, ANALYZE, NAVIGATE) → auto-executed instantly
+   - `MEDIUM` (UPDATE) → shown to user with preview, requires confirmation
+   - `HIGH` (CREATE, DELETE) → requires confirmation + optional 2FA
+4. **Approval** — user reviews affected records, optionally selects per-record, confirms or rejects
+5. **Execution** — action runs through the NLP CRUD engine with RBAC enforcement
+6. **Audit trail** — every action (whether executed, rejected, or failed) is logged immutably
+
+The **Governance Dashboard** (`/governance`, admin only) shows all pending approvals, live operation stats, and the full audit trail with risk/module/operation filters.
+
+---
+
+## Project Structure
 
 ```
 project-expo/
-├── frontend/                        # React + Vite SPA
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Sidebar.jsx          # Role-based nav + NotificationBell + ThemeToggle
-│   │   │   ├── ChatWidget.jsx       # Floating AI chatbot (Context-Aware)
-│   │   │   ├── NotificationBell.jsx # Dropdown notifications with unread badge
-│   │   │   └── ThemeToggle.jsx      # Dark/light mode toggle
-│   │   ├── pages/
-│   │   │   ├── Login.jsx            # Auth page
-│   │   │   ├── StudentDashboard.jsx # Student KPIs, predictions, attendance
-│   │   │   ├── StudentProfile.jsx   # Profile editor + change password
-│   │   │   ├── AttendanceDetails.jsx# Per-course breakdown + heatmap calendar
-│   │   │   ├── FacultyConsole.jsx   # Course analytics + risk roster + QR
-│   │   │   ├── AdminPanel.jsx       # Campus-wide KPIs + department analytics
-│   │   │   ├── Timetable.jsx        # NEW: Visual schedule viewer
-│   │   │   └── CopilotPanel.jsx     # AI Copilot natural language interface
-│   │   ├── context/AuthContext.jsx  # JWT auth state
-│   │   ├── services/api.js          # 60+ API methods
-│   │   ├── App.jsx                  # Router + auth guards
-│   │   └── index.css                # Design system (dark + light themes)
-│   ├── package.json
-│   └── Dockerfile
-├── backend/                         # FastAPI + Python
+├── frontend/
+│   └── src/
+│       ├── pages/
+│       │   ├── CopilotPanel.jsx         # Command Console (NL → Plan → Execute)
+│       │   ├── GovernanceDashboard.jsx  # Admin oversight + pending approvals
+│       │   ├── StudentDashboard.jsx
+│       │   ├── FacultyConsole.jsx
+│       │   ├── AdminPanel.jsx
+│       │   ├── FinanceManagement.jsx
+│       │   ├── HRManagement.jsx
+│       │   └── Timetable.jsx
+│       ├── components/
+│       │   ├── ChatWidget.jsx           # Floating Gemini chatbot
+│       │   └── Sidebar.jsx              # Live pending approval badge
+│       └── services/api.js              # All API methods
+│
+├── backend/
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── routes/
-│   │   │   │   ├── auth.py          # Register, login, password reset/change
-│   │   │   │   ├── students.py      # Dashboard, profile, attendance details
-│   │   │   │   ├── faculty.py       # Courses, risk roster
-│   │   │   │   ├── attendance.py    # QR generate/mark, analytics
-│   │   │   │   ├── predictions.py   # Individual + batch predictions
-│   │   │   │   ├── chatbot.py       # AI chatbot queries
-│   │   │   │   ├── copilot.py       # AI Copilot plan/execute/history
-│   │   │   │   ├── timetable.py     # NEW: Timetable management
-│   │   │   │   └── notifications.py # System-wide alerts
-│   │   │   └── dependencies.py      # JWT auth + role guards
-│   │   ├── models/models.py         # SQLAlchemy ORM (10 models)
-│   │   ├── schemas/schemas.py       # Pydantic v2 (50+ schemas)
 │   │   ├── services/
-│   │   │   ├── auth_service.py      # Registration + profile logic
-│   │   │   ├── attendance_service.py# Attendance tracking
-│   │   │   ├── prediction_service.py# AI grade predictions
-│   │   │   ├── chatbot_service.py   # Context-aware LLM engine
-│   │   │   ├── copilot_service.py   # Multi-step action planner
-│   │   │   └── nlp_crud_service.py  # NL → Data translation
-│   │   ├── ml/                      # Seed data, training, prediction logic
-│   │   ├── core/                    # Config, security, database
-│   │   ├── seed.py                  # Demo data seeder (incl. Timetables)
-│   │   └── main.py                  # FastAPI app entry
-│   ├── requirements.txt
+│   │   │   ├── gemini_pool_service.py   # Key pool: generate_json + generate_text
+│   │   │   ├── copilot_service.py       # Action planning + risk classification
+│   │   │   ├── nlp_crud_service.py      # Intent detection + CRUD execution
+│   │   │   ├── chatbot_service.py       # Context-aware Gemini chat
+│   │   │   ├── conversational_ops_service.py  # Ops AI core + audit
+│   │   │   ├── attendance_service.py
+│   │   │   └── prediction_service.py
+│   │   ├── api/routes/
+│   │   │   ├── operational_ai.py        # /ops-ai/* endpoints
+│   │   │   ├── copilot.py
+│   │   │   └── chatbot.py
+│   │   ├── models/models.py
+│   │   ├── core/config.py               # Gemini key pool config
+│   │   └── seed_db.py
 │   ├── .env.example
-│   └── Dockerfile
-├── docker-compose.yml               # Multi-container setup
-├── CAMPUSIQ_ARCHITECTURE.md
+│   └── requirements.txt
+│
+├── docker-compose.yml
 └── README.md
 ```
 
 ---
 
-## 🧠 Core Modules
+## Troubleshooting
 
-### 1. 🤖 AI Copilot
-Natural language interface for deep ERP management. Supports thousands of command variations through a multi-step action planner with Human-in-the-Loop confirmations.
+**AI features return "no response" or use fallback:**
+- Verify `GOOGLE_API_KEY` is set correctly in `.env`
+- Check the key is active at https://aistudio.google.com/app/apikey
+- Check backend logs: `docker-compose logs backend` — look for `GeminiPoolError`
 
-### 2. 💬 Context-Aware AI Chatbot (IMPROVED)
-The chatbot now automatically understands *who* is asking. It injects live student attendance, CGPA, and grade predictions (or faculty designations/courses) directly into the LLM context to provide personalized academic advice.
+**Rate limit errors (`429`) during heavy use:**
+- Add 2–3 more keys to `GEMINI_NLP_KEYS` and `GEMINI_CHAT_KEYS` (comma-separated)
+- Free tier: 15 RPM per key — 3 keys gives 45 RPM per module
 
-### 3. 📅 AI-Powered Timetable (NEW)
-A visual, interactive schedule viewer for students and faculty. Displays daily class timings, course codes, room numbers (simulated), and faculty details. Integrated with the attendance system.
+**Database already seeded warning:**
+- Normal on restart — the seeder is idempotent and skips if data exists
 
-### 4. 🛡️ Security & Reliability (IMPROVED)
-- **Hardened Auth**: Replaced truncated bcrypt hashing with full PBKDF2-SHA256.
-- **Robust Routing**: NLP CRUD engine now uses precise regex-based intent classification.
-- **Fail-Safe Processing**: Comprehensive audit fixed 10+ core issues including database session commits and runtime edge cases.
+**Frontend cannot reach backend:**
+- Ensure backend is running on port 8000
+- Check `VITE_API_PROXY_TARGET` in docker-compose.yml or vite.config.js
 
-### 5. 🔮 Performance Prediction Engine
-XGBoost model predicting final grades with SHAP factors. Automatically flags "At-Risk" students (below 65% attendance or predicted Fail/D grade).
-
----
-
-## 🔌 New API Endpoints
-
-### Timetable
-| Method | Endpoint | Description | Auth |
-|---|---|---|---|
-| GET | `/api/timetable/student` | Get current student's timetable | Student |
-| GET | `/api/timetable/faculty` | Get current faculty timetable | Faculty |
-| POST | `/api/timetable/` | Create one timetable slot | Admin |
-| DELETE | `/api/timetable/{slot_id}` | Delete a timetable slot | Admin |
+**ML model not found error:**
+- Run `python -m app.ml.seed_data && python -m app.ml.train` inside the backend directory
 
 ---
 
-## 👥 Team & Development
+## License
 
-- **Project**: CampusIQ — AI-First Intelligent College ERP
-- **Hackathon**: Project Expo MVP
-- **Technology**: Built with a focus on **On-Premise AI** to ensure data privacy in educational institutions.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.
+MIT License — see LICENSE file.
 
 ---
 
 > **CampusIQ** — _Because a college shouldn't need 100 humans to do what intelligent software can do in seconds._
-

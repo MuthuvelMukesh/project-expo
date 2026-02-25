@@ -236,6 +236,14 @@ class ApiService {
         return this.request(`/ops-ai/audit${q ? `?${q}` : ''}`);
     }
 
+    async getPendingApprovals() {
+        return this.request('/ops-ai/pending');
+    }
+
+    async getOpsStats() {
+        return this.request('/ops-ai/stats');
+    }
+
     // ─── User Management (Admin) ─────────────────────────────
     async listUsers(role = null) {
         const q = role ? `?role=${role}` : '';

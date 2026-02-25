@@ -8,7 +8,6 @@ import json
 import re
 import uuid
 import logging
-import httpx
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +20,7 @@ from app.models.models import (
     Attendance, Prediction, ActionLog,
 )
 from app.services.nlp_crud_service import process_nlp_crud, MODEL_REGISTRY
+from app.services.gemini_pool_service import GeminiPoolClient, GeminiPoolError
 
 settings = get_settings()
 log = logging.getLogger("campusiq.copilot")
@@ -85,11 +85,11 @@ def _needs_confirmation(risk_level: str) -> bool:
 # ─── Action Planning via LLM ────────────────────────────────────
 
 async def _plan_with_llm(message: str, user_role: str) -> Optional[list]:
-    """Use Ollama to break a NL request into structured actions."""
+    """Use Gemini to break a NL request into structured actions."""
     capabilities = ROLE_CAPABILITIES.get(user_role, ROLE_CAPABILITIES["student"])
 
     prompt = f"""You are the CampusIQ AI Copilot, a college ERP action planner.
-The user is a **{capabilities['label']}** ({user_role}).
+The user is a {capabilities['label']} ({user_role}).
 
 Their capabilities:
 - Can READ: {', '.join(capabilities['can_read'])}
@@ -111,99 +111,23 @@ Break the user's request into a JSON array of atomic actions. Each action:
 Rules:
 - If the user asks something they have no capability for, return an action with type "DENIED"
 - For multi-step tasks, break into individual atomic actions
-- For "show my dashboard" → type "NAVIGATE", entity "dashboard"
-- For "generate QR" → type "CREATE", entity "attendance", params with course info
+- For "show my dashboard" use type "NAVIGATE", entity "dashboard"
 - Keep params simple: use "name", "filters", "values", "count" etc.
 
 User request: "{message}"
 
 Return ONLY a valid JSON array, no other text."""
 
-    provider = (settings.LLM_PROVIDER or "ollama").strip().lower()
-
-    async def _parse_actions(content: str) -> Optional[list]:
+    try:
+        result = await GeminiPoolClient.generate_json(module="nlp", prompt=prompt, timeout=25.0)
+        content = result.get("text", "")
         json_match = re.search(r'\[.*\]', content, re.DOTALL)
         if json_match:
             return json.loads(json_match.group())
-        return None
-
-    async def _plan_via_google() -> Optional[list]:
-        if not settings.GOOGLE_API_KEY:
-            log.warning("Google provider selected but GOOGLE_API_KEY is not set.")
-            return None
-
-        endpoint = (
-            f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
-            f"?key={settings.GOOGLE_API_KEY}"
-        )
-        payload = {
-            "systemInstruction": {
-                "parts": [{"text": "You are a precise JSON-only action planner. Return only valid JSON arrays."}]
-            },
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}],
-                }
-            ],
-            "generationConfig": {"temperature": 0.1},
-        }
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(endpoint, json=payload)
-
-        if response.status_code != 200:
-            log.error("Google planner HTTP %s — %s", response.status_code, response.text[:200])
-            return None
-
-        data = response.json()
-        candidates = data.get("candidates") or []
-        if not candidates:
-            return None
-
-        parts = candidates[0].get("content", {}).get("parts", [])
-        content = "".join(p.get("text", "") for p in parts)
-        return await _parse_actions(content)
-
-    async def _plan_via_ollama() -> Optional[list]:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{settings.OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": settings.OLLAMA_MODEL,
-                    "messages": [
-                        {"role": "system", "content": "You are a precise JSON-only action planner. Return only valid JSON arrays."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.1},
-                },
-            )
-
-        if response.status_code != 200:
-            return None
-
-        data = response.json()
-        content = data.get("message", {}).get("content", "")
-        return await _parse_actions(content)
-
-    try:
-        if provider == "google":
-            actions = await _plan_via_google()
-            if actions is not None:
-                return actions
-            log.info("Falling back to Ollama planner after Google LLM failure.")
-
-        actions = await _plan_via_ollama()
-        if actions is not None:
-            return actions
-
-    except httpx.ConnectError:
-        log.info("LLM provider not reachable for copilot action planning — using keyword fallback.")
-    except httpx.TimeoutException:
-        log.warning("LLM provider timed out during copilot action planning.")
+    except GeminiPoolError as e:
+        log.warning("Gemini pool error in copilot planner: %s (code=%s)", e.message, e.code)
     except json.JSONDecodeError as e:
-        log.warning("Copilot LLM returned invalid JSON: %s", e)
+        log.warning("Copilot Gemini returned invalid JSON: %s", e)
     except Exception as e:
         log.error("Unexpected error in copilot _plan_with_llm: %s", e, exc_info=True)
 

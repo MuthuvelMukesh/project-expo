@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -842,6 +842,105 @@ async def rollback_execution(*, db: AsyncSession, user: User, execution_id: str)
             "status": "rollback_failed",
             "error": str(exc),
         }
+
+
+async def get_pending_approvals(*, db: AsyncSession, user: User) -> list[dict]:
+    """Return all plans with status awaiting_approval (admin only)."""
+    if user.role.value not in settings.OPS_SENIOR_ROLE_SET:
+        return []
+
+    stmt = (
+        select(OperationalPlan, User)
+        .join(User, OperationalPlan.user_id == User.id)
+        .where(OperationalPlan.status == "awaiting_approval")
+        .order_by(OperationalPlan.created_at.asc())
+    )
+    rows = (await db.execute(stmt)).all()
+
+    return [
+        {
+            "plan_id": plan.plan_id,
+            "user_id": plan.user_id,
+            "requester_name": requester.full_name,
+            "module": plan.module,
+            "message": plan.message,
+            "intent_type": plan.intent_type,
+            "entity": plan.entity,
+            "risk_level": plan.risk_level,
+            "estimated_impact_count": plan.estimated_impact_count,
+            "requires_2fa": plan.requires_2fa,
+            "created_at": plan.created_at.isoformat() if plan.created_at else None,
+        }
+        for plan, requester in rows
+    ]
+
+
+async def get_ops_stats(*, db: AsyncSession, user: User) -> dict:
+    """Return aggregate operation statistics (admin only)."""
+    from datetime import date as date_type, time as time_type
+
+    today_start = datetime.combine(date_type.today(), time_type.min)
+
+    total_plans = (await db.execute(select(func.count()).select_from(OperationalPlan))).scalar() or 0
+    awaiting = (
+        await db.execute(
+            select(func.count()).select_from(OperationalPlan).where(OperationalPlan.status == "awaiting_approval")
+        )
+    ).scalar() or 0
+
+    executed_today = (
+        await db.execute(
+            select(func.count())
+            .select_from(OperationalExecution)
+            .where(
+                and_(
+                    OperationalExecution.status == "executed",
+                    OperationalExecution.executed_at >= today_start,
+                )
+            )
+        )
+    ).scalar() or 0
+
+    failed_total = (
+        await db.execute(
+            select(func.count()).select_from(OperationalExecution).where(OperationalExecution.status == "failed")
+        )
+    ).scalar() or 0
+
+    # Risk distribution
+    risk_rows = (
+        await db.execute(
+            select(OperationalPlan.risk_level, func.count().label("cnt"))
+            .group_by(OperationalPlan.risk_level)
+        )
+    ).all()
+    by_risk = [{"risk_level": r, "count": c} for r, c in risk_rows]
+
+    # Module distribution
+    module_rows = (
+        await db.execute(
+            select(
+                OperationalPlan.module,
+                func.count().label("total"),
+                func.sum(case((OperationalPlan.status == "executed", 1), else_=0)).label("executed"),
+                func.sum(case((OperationalPlan.status == "failed", 1), else_=0)).label("failed"),
+                func.sum(case((OperationalPlan.status == "rolled_back", 1), else_=0)).label("rolled_back"),
+            ).group_by(OperationalPlan.module)
+        )
+    ).all()
+    by_module = [
+        {"module": m, "total": t, "executed": e or 0, "failed": f or 0, "rolled_back": rb or 0}
+        for m, t, e, f, rb in module_rows
+    ]
+
+    return {
+        "total_plans": total_plans,
+        "awaiting_approval": awaiting,
+        "executed_today": executed_today,
+        "failed_total": failed_total,
+        "by_risk": by_risk,
+        "by_module": by_module,
+    }
 
 
 async def get_audit_history(

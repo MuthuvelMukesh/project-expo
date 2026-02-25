@@ -1,14 +1,13 @@
 """
 CampusIQ — NLP CRUD Engine Service
 Translates natural language queries into safe database operations.
-Uses Ollama LLM for intent detection and entity extraction,
-with keyword-based fallback when LLM is unavailable.
+Uses Gemini (via key-pool client) for intent detection and entity extraction,
+with keyword-based fallback when Gemini is unavailable.
 """
 
 import json
 import re
 import logging
-import httpx
 from typing import Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete, insert, and_, or_, cast, String
@@ -18,6 +17,7 @@ from app.core.config import get_settings
 from app.models.models import (
     User, UserRole, Department, Student, Faculty, Course, Attendance, Prediction
 )
+from app.services.gemini_pool_service import GeminiPoolClient, GeminiPoolError
 
 settings = get_settings()
 log = logging.getLogger("campusiq.nlp_crud")
@@ -155,7 +155,7 @@ def _check_access(user_role: str, intent: str, entity: str) -> tuple[bool, str]:
 # ─── Intent Detection ────────────────────────────────────────────
 
 async def detect_intent_llm(message: str) -> Optional[dict]:
-    """Use Ollama LLM to detect intent and extract structured info."""
+    """Use Gemini to detect intent and extract structured info from a natural language message."""
     prompt = f"""You are a database query classifier for a college ERP system called CampusIQ.
 The database has these tables: students, faculty, courses, departments, attendance, predictions, users.
 
@@ -173,34 +173,15 @@ User message: "{message}"
 Return ONLY valid JSON, no other text."""
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{settings.OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": settings.OLLAMA_MODEL,
-                    "messages": [
-                        {"role": "system", "content": "You are a precise JSON-only classifier. Return only valid JSON."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.1},
-                },
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                content = data.get("message", {}).get("content", "")
-                # Extract JSON from response (handle markdown code blocks)
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                if json_match:
-                    return json.loads(json_match.group())
-
-    except httpx.ConnectError:
-        log.info("Ollama not reachable for NLP intent detection — using keyword fallback.")
-    except httpx.TimeoutException:
-        log.warning("Ollama timed out during intent detection for: %s", message[:80])
+        result = await GeminiPoolClient.generate_json(module="nlp", prompt=prompt, timeout=20.0)
+        content = result.get("text", "")
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group())
+    except GeminiPoolError as e:
+        log.warning("Gemini NLP pool error in detect_intent_llm: %s (code=%s)", e.message, e.code)
     except json.JSONDecodeError as e:
-        log.warning("Failed to parse LLM response as JSON: %s", e)
+        log.warning("Failed to parse Gemini JSON response for intent detection: %s", e)
     except Exception as e:
         log.error("Unexpected error in detect_intent_llm: %s", e, exc_info=True)
 

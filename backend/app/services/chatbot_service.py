@@ -1,17 +1,11 @@
 """
-CampusIQ — Chatbot Service  (v2 – context-aware, robust routing)
+CampusIQ — Chatbot Service  (v3 – Gemini-only, context-aware)
 
-Key improvements over v1:
-  1. Errors are logged, not silently swallowed.
-  2. LLM prompt injects live student/faculty context (attendance, CGPA, predictions).
-  3. Routing uses an intent-confidence check instead of a flat keyword match—
-     only routes to the NLP-CRUD engine when the message is clearly a data command.
-  4. Fallback responses are richer with role-specific guidance and markdown tips.
-  5. Ollama is always tried first for general chat; rule-based is true last resort.
+All LLM calls route exclusively through the Gemini key-pool client.
+Ollama dependency removed. Rule-based fallback kept as last resort.
 """
 
 import logging
-import httpx
 import re
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +14,7 @@ from sqlalchemy import select, func
 from app.core.config import get_settings
 from app.models.models import Student, Faculty, Course, Attendance, Prediction, User
 from app.services.nlp_crud_service import process_nlp_crud
+from app.services.gemini_pool_service import GeminiPoolClient, GeminiPoolError
 
 settings = get_settings()
 log = logging.getLogger("campusiq.chatbot")
@@ -27,27 +22,18 @@ log = logging.getLogger("campusiq.chatbot")
 
 # ─── Intent detection ──────────────────────────────────────────
 
-# Only route to CRUD engine when the message is clearly an *imperative data
-# command*.  Phrases like "what is attendance" or "how does grading work" should
-# NOT be routed as data queries.
+# Only route to CRUD engine when message is clearly an imperative data command.
 _CRUD_VERB_PATTERNS = [
-    # explicit data-fetch verbs followed by entity hints
     r"\b(show|list|display|fetch|get|find)\b.+\b(student|faculty|course|department|user|attendance|prediction|record)s?\b",
-    # count / aggregate
     r"\b(how many|count|total)\b.+\b(student|faculty|course|department|user)s?\b",
     r"\b(average|avg|sum|minimum|maximum|highest|lowest|top)\b.+\b(cgpa|gpa|attendance|grade|score|mark)s?\b",
-    # CUD
     r"\b(add|create|insert|register|new)\b.+\b(student|faculty|course|department|user)s?\b",
     r"\b(update|change|modify|set|edit)\b.+\b(student|faculty|course|department|user)s?\b",
     r"\b(delete|remove|drop)\b.+\b(student|faculty|course|department|user)s?\b",
-    # "my" data requests that clearly want live data
     r"\bmy (attendance|cgpa|gpa|grades?|predictions?|profile|details|records?|schedule|courses?)\b",
-    # explicit analysis
     r"\b(group by|distribution|analyze|stats|statistics)\b",
-    # "all X" pattern
     r"\ball (students?|faculty|courses?|departments?|users?)\b",
 ]
-
 _CRUD_RE = re.compile("|".join(_CRUD_VERB_PATTERNS), re.IGNORECASE)
 
 
@@ -59,7 +45,7 @@ def _is_data_query(message: str) -> bool:
 # ─── User context builder ──────────────────────────────────────
 
 async def _build_user_context(user_id: int, user_role: str, db: AsyncSession) -> str:
-    """Fetch live stats about the current user so the LLM can give specific answers."""
+    """Fetch live stats about the current user so Gemini can give specific answers."""
     lines: list[str] = []
     try:
         if user_role == "student":
@@ -70,7 +56,6 @@ async def _build_user_context(user_id: int, user_role: str, db: AsyncSession) ->
                 lines.append(f"Semester: {stu.semester}, Section: {stu.section or 'N/A'}")
                 lines.append(f"CGPA: {stu.cgpa}")
 
-                # Per-course attendance stats
                 courses_res = await db.execute(
                     select(Course).where(
                         Course.department_id == stu.department_id,
@@ -102,7 +87,6 @@ async def _build_user_context(user_id: int, user_role: str, db: AsyncSession) ->
                     lines.append("Attendance per course:")
                     lines.extend(att_summaries)
 
-                # Latest predictions
                 pred_res = await db.execute(
                     select(Prediction, Course.name, Course.code)
                     .join(Course, Prediction.course_id == Course.id, isouter=True)
@@ -136,140 +120,39 @@ async def _build_user_context(user_id: int, user_role: str, db: AsyncSession) ->
     return "\n".join(lines) if lines else "No additional user data available."
 
 
-# ─── LLM call ──────────────────────────────────────────────────
+# ─── Gemini chat call ──────────────────────────────────────────
 
-async def _query_ollama(
-    message: str,
-    user_role: str,
-    user_context: str,
-) -> Optional[str]:
-    """Query Ollama with a rich, context-injected prompt."""
-    system_prompt = f"""You are **CampusIQ**, the AI assistant embedded in a college ERP system.
-
-Role of the current user: **{user_role}**
-
-Live data about this user:
-{user_context}
-
-Guidelines:
-- Answer concisely (3-6 sentences max) unless the question needs more detail.
-- When the user asks about *their* attendance, grades, or predictions, use the live data above to give a specific, personalised answer.
-- If the answer is definitively in the live data, reference the exact numbers.
-- If you genuinely don't know something, say so and suggest which dashboard section might help.
-- Use markdown formatting (bold, bullets) for readability.
-- Do NOT make up numbers that are not in the live data section above."""
-
-    try:
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            resp = await client.post(
-                f"{settings.OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": settings.OLLAMA_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": message},
-                    ],
-                    "stream": False,
-                    "options": {"temperature": 0.4},
-                },
-            )
-
-            if resp.status_code == 200:
-                content = resp.json().get("message", {}).get("content", "").strip()
-                if content:
-                    return content
-                log.warning("Ollama returned empty content for: %s", message[:80])
-            else:
-                log.error("Ollama HTTP %s — %s", resp.status_code, resp.text[:200])
-
-    except httpx.ConnectError:
-        log.info("Ollama not reachable — falling back to rule-based.")
-    except httpx.TimeoutException:
-        log.warning("Ollama timed out for: %s", message[:80])
-    except Exception as e:
-        log.error("Unexpected Ollama error: %s", e, exc_info=True)
-
-    return None
-
-
-async def _query_google(
-    message: str,
-    user_role: str,
-    user_context: str,
-) -> Optional[str]:
-    """Query Google AI Studio (Gemini) using API key auth."""
-    system_prompt = f"""You are **CampusIQ**, the AI assistant embedded in a college ERP system.
-
-Role of the current user: **{user_role}**
-
-Live data about this user:
-{user_context}
-
-Guidelines:
-- Answer concisely (3-6 sentences max) unless the question needs more detail.
-- When the user asks about *their* attendance, grades, or predictions, use the live data above to give a specific, personalised answer.
-- If the answer is definitively in the live data, reference the exact numbers.
-- If you genuinely don't know something, say so and suggest which dashboard section might help.
-- Use markdown formatting (bold, bullets) for readability.
-- Do NOT make up numbers that are not in the live data section above."""
-
-    if not settings.GOOGLE_API_KEY:
-        log.warning("Google provider selected but GOOGLE_API_KEY is not set.")
-        return None
-
-    endpoint = (
-        f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
-        f"?key={settings.GOOGLE_API_KEY}"
+def _build_system_prompt(user_role: str, user_context: str) -> str:
+    return (
+        f"You are CampusIQ, the AI assistant embedded in a college ERP system.\n\n"
+        f"Role of the current user: {user_role}\n\n"
+        f"Live data about this user:\n{user_context}\n\n"
+        "Guidelines:\n"
+        "- Answer concisely (3-6 sentences max) unless the question needs more detail.\n"
+        "- When the user asks about their attendance, grades, or predictions, use the live data above.\n"
+        "- If the answer is in the live data, reference the exact numbers.\n"
+        "- If you don't know something, say so and suggest which dashboard section might help.\n"
+        "- Use markdown formatting (bold, bullets) for readability.\n"
+        "- Do NOT make up numbers that are not in the live data section above.\n"
+        "- For operational tasks (creating/updating/deleting records), suggest using the Command Console."
     )
 
+
+async def _query_gemini(message: str, user_role: str, user_context: str) -> Optional[str]:
+    """Query Gemini via key pool for a conversational response."""
     try:
-        payload = {
-            "systemInstruction": {"parts": [{"text": system_prompt}]},
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": message}],
-                }
-            ],
-            "generationConfig": {"temperature": 0.4},
-        }
-
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            resp = await client.post(endpoint, json=payload)
-
-        if resp.status_code != 200:
-            log.error("Google LLM HTTP %s — %s", resp.status_code, resp.text[:200])
-            return None
-
-        data = resp.json()
-        candidates = data.get("candidates") or []
-        if not candidates:
-            return None
-
-        parts = candidates[0].get("content", {}).get("parts", [])
-        content = "".join(p.get("text", "") for p in parts).strip()
-        return content or None
-
-    except httpx.ConnectError:
-        log.info("Google LLM not reachable.")
-    except httpx.TimeoutException:
-        log.warning("Google LLM timed out for: %s", message[:80])
+        return await GeminiPoolClient.generate_text(
+            module="chat",
+            system_prompt=_build_system_prompt(user_role, user_context),
+            user_message=message,
+            temperature=0.4,
+        )
+    except GeminiPoolError as e:
+        log.warning("Gemini chat pool error: %s (code=%s)", e.message, e.code)
+        return None
     except Exception as e:
-        log.error("Unexpected Google LLM error: %s", e, exc_info=True)
-
-    return None
-
-
-async def _query_llm(message: str, user_role: str, user_context: str) -> Optional[str]:
-    provider = (settings.LLM_PROVIDER or "ollama").strip().lower()
-
-    if provider == "google":
-        response = await _query_google(message, user_role, user_context)
-        if response:
-            return response
-        log.info("Falling back to Ollama after Google LLM failure.")
-
-    return await _query_ollama(message, user_role, user_context)
+        log.error("Unexpected Gemini error in chatbot: %s", e, exc_info=True)
+        return None
 
 
 # ─── Main entry point ──────────────────────────────────────────
@@ -280,9 +163,9 @@ async def process_query(
     user_id: int,
     db: AsyncSession = None,
 ) -> dict:
-    """Process a natural language query using NLP CRUD engine or LLM chat."""
+    """Process a natural language query using the NLP CRUD engine or Gemini chat."""
 
-    # ── 1.  Try NLP CRUD engine for clear data commands ──
+    # 1. Route clear data commands to the NLP CRUD engine
     if db and _is_data_query(message):
         try:
             crud_result = await process_nlp_crud(
@@ -293,8 +176,6 @@ async def process_query(
             )
 
             response_text = crud_result["summary"]
-
-            # append a markdown table when we have data
             raw_data = (crud_result.get("result") or {}).get("data")
             if raw_data and len(raw_data) > 0:
                 headers = list(raw_data[0].keys())
@@ -307,33 +188,30 @@ async def process_query(
 
             return {
                 "response": response_text,
-                "sources": ["CampusIQ AI Data Engine"],
+                "sources": ["CampusIQ Data Engine"],
                 "suggested_actions": _get_data_actions(crud_result),
             }
-
         except Exception as e:
             log.error("NLP CRUD engine failed: %s", e, exc_info=True)
-            # We still fall through to the LLM – NOT silently lost anymore.
 
-    # ── 2.  Build user-specific context for the LLM ──
+    # 2. Build user-specific context for Gemini
     user_context = "No session context available."
     if db:
         user_context = await _build_user_context(user_id, user_role, db)
 
-    # ── 3.  Ask the LLM with full context ──
-    llm_response = await _query_llm(message, user_role, user_context)
+    # 3. Query Gemini
+    llm_response = await _query_gemini(message, user_role, user_context)
     if llm_response:
         return {
             "response": llm_response,
-            "sources": ["CampusIQ AI (Local LLM)"],
+            "sources": ["CampusIQ AI (Gemini)"],
             "suggested_actions": _get_suggested_actions(message, user_role),
         }
 
-    # ── 4.  Rule-based fallback (last resort) ──
-    response = _rule_based_response(message, user_role)
+    # 4. Rule-based fallback — no LLM dependency
     return {
-        "response": response,
-        "sources": ["CampusIQ Knowledge Base (offline)"],
+        "response": _rule_based_response(message, user_role),
+        "sources": ["CampusIQ Knowledge Base"],
         "suggested_actions": _get_suggested_actions(message, user_role),
     }
 
@@ -342,108 +220,89 @@ async def process_query(
 
 _KNOWLEDGE_BASE = {
     "attendance": (
-        "📊 **Attendance:** Check your attendance on the **Student Dashboard**. "
-        "Each course shows your percentage, status (safe/warning/danger), and "
-        "how many more classes you need for 75%. You can also visit the "
-        "**Attendance Details** page for a per-date heatmap calendar."
+        "**Attendance:** Check your attendance on the Student Dashboard. "
+        "Each course shows your percentage and how many more classes you need for 75%. "
+        "Visit **Attendance Details** for a per-date calendar view."
     ),
     "predict": (
-        "🔮 **Grade Predictions:** CampusIQ uses an XGBoost ML model trained on "
-        "attendance, assignments, quizzes, labs, and CGPA to predict your likely "
-        "exam grade. Each prediction includes SHAP explanations of which factors "
-        "matter most. See the **Predictions** section on your dashboard."
+        "**Grade Predictions:** CampusIQ uses an XGBoost ML model trained on "
+        "attendance, assignments, quizzes, and CGPA to predict your grade. "
+        "Each prediction includes SHAP explainability. See the Predictions section on your dashboard."
     ),
     "risk": (
-        "⚠️ **Risk Score:** Your risk score (0–1) indicates the probability of "
-        "academic difficulty. A score above 0.6 is flagged as **high risk** and "
-        "triggers alerts to your mentor. The SHAP factors show exactly which "
-        "areas need improvement."
+        "**Risk Score:** Your risk score (0-1) indicates probability of academic difficulty. "
+        "A score above 0.6 is flagged as high risk. "
+        "The SHAP factors show exactly which areas need improvement."
     ),
     "qr": (
-        "📱 **QR Attendance:** Your faculty generates a time-limited QR code in "
-        "class (expires in ~90 seconds). Open CampusIQ → scan the QR → attendance "
-        "is marked instantly. Each code is single-use and validated against the "
-        "class schedule."
+        "**QR Attendance:** Your faculty generates a time-limited QR code in class. "
+        "Open CampusIQ, scan the QR, and attendance is marked instantly. "
+        "Each code is single-use and validated against the class schedule."
     ),
     "grade": (
-        "📝 **Grading:** Grades are predicted using ML models trained on historical "
-        "campus data. The prediction includes a confidence score and the top "
-        "factors influencing your grade."
+        "**Grading:** Grades are predicted using ML models trained on historical campus data. "
+        "Each prediction includes a confidence score and the top contributing factors."
     ),
     "copilot": (
-        "🤖 **AI Copilot:** Use the Copilot panel to manage the ERP with natural "
-        "language. Try: *'Show all CSE students with CGPA above 8'* or *'Create "
-        "a new course CS601'*. Destructive actions require confirmation."
+        "**Command Console:** Use the Command Console to manage the ERP with natural language. "
+        "Try: *Show all CSE students with CGPA above 8* or *Generate payroll summary*. "
+        "High-risk actions require confirmation before execution."
     ),
     "timetable": (
-        "📅 **Timetable:** View your weekly schedule on the **Timetable** page. "
-        "It shows a colour-coded grid of lectures, labs, and tutorials with rooms "
-        "and instructor names."
+        "**Timetable:** View your weekly schedule on the Timetable page. "
+        "It shows a colour-coded grid of lectures, labs, and tutorials with rooms and instructor names."
     ),
 }
 
 
 def _rule_based_response(message: str, user_role: str) -> str:
-    """Keyword-match against the knowledge base, with role-aware defaults."""
     msg = message.lower()
-
     for keyword, response in _KNOWLEDGE_BASE.items():
         if keyword in msg:
             return response
 
-    # Role-specific help menu
     if user_role == "student":
         return (
-            "👋 Hi! I'm CampusIQ AI. Here's what I can help you with:\n\n"
-            "• **My attendance** — ask about your attendance percentage\n"
-            "• **My predictions** — see your predicted grades\n"
-            "• **Risk score** — understand your academic risk\n"
-            "• **Timetable** — view your class schedule\n"
-            "• **QR attendance** — how to scan & mark attendance\n\n"
-            "💡 Try asking: *'What is my attendance?'* or *'Am I at risk?'*"
+            "Hi! I'm CampusIQ AI. Here's what I can help you with:\n\n"
+            "- **My attendance** — ask about your attendance percentage\n"
+            "- **My predictions** — see your predicted grades\n"
+            "- **Risk score** — understand your academic risk\n"
+            "- **Timetable** — view your class schedule\n\n"
+            "Try: *What is my attendance?* or *Am I at risk?*"
         )
     elif user_role == "faculty":
         return (
-            "👋 Hi! I'm CampusIQ AI. I can help you with:\n\n"
-            "• **My courses** — your teaching load\n"
-            "• **Risk roster** — students at academic risk\n"
-            "• **Attendance analytics** — class attendance trends\n"
-            "• **Data queries** — ask about students, grades, or departments\n\n"
-            "💡 Try: *'Show students at risk in CS301'* or *'Average attendance for my courses'*"
+            "Hi! I'm CampusIQ AI. I can help you with:\n\n"
+            "- **My courses** — your teaching load\n"
+            "- **Risk roster** — students at academic risk\n"
+            "- **Attendance analytics** — class attendance trends\n\n"
+            "Try: *Show students at risk in CS301* or *Average attendance for my courses*"
         )
-    else:
-        return (
-            "👋 Hi! I'm CampusIQ AI. As an admin, you can:\n\n"
-            "• **Manage records** — users, courses, departments\n"
-            "• **Campus analytics** — enrollment, risk, attendance trends\n"
-            "• **AI Data queries** — natural language database queries\n"
-            "• **Copilot** — multi-step operations via natural language\n\n"
-            "💡 Try: *'How many students are there?'* or *'Show all departments'*"
-        )
+    return (
+        "Hi! I'm CampusIQ AI. As an admin:\n\n"
+        "- Use **Command Console** for natural language ERP operations\n"
+        "- Use **Governance Dashboard** for approvals and audit trail\n"
+        "- Ask me: *How many students are there?* or *Show all departments*"
+    )
 
 
-# ─── Suggested actions generator ───────────────────────────────
+# ─── Suggested actions ─────────────────────────────────────────
 
 def _get_data_actions(crud_result: dict) -> list:
-    """Follow-up actions based on CRUD result."""
     intent = crud_result.get("intent", "")
     entity = crud_result.get("entity", "").lower()
-
-    actions = []
     if intent == "READ":
-        actions = [f"Analyze {entity} statistics", f"Count total {entity}s", f"Filter {entity}s by department"]
-    elif intent == "ANALYZE":
-        actions = [f"Show all {entity}s", "Group by department", "Show top performers"]
-    elif intent in ("CREATE", "UPDATE", "DELETE"):
-        actions = [f"Show all {entity}s", f"Count {entity}s"]
-    return actions[:3]
+        return [f"Analyze {entity} statistics", f"Count total {entity}s", f"Filter {entity}s by department"][:3]
+    if intent == "ANALYZE":
+        return [f"Show all {entity}s", "Group by department", "Show top performers"][:3]
+    if intent in ("CREATE", "UPDATE", "DELETE"):
+        return [f"Show all {entity}s", f"Count {entity}s"]
+    return []
 
 
 def _get_suggested_actions(message: str, user_role: str) -> list:
-    """Contextual suggested follow-up actions."""
     msg = message.lower()
     actions = []
-
     if "attendance" in msg:
         actions.extend(["Show my attendance details", "Which course has lowest attendance?"])
     if "grade" in msg or "predict" in msg:
@@ -458,5 +317,4 @@ def _get_suggested_actions(message: str, user_role: str) -> list:
             actions = ["Show at-risk students", "My course analytics", "Attendance trend"]
         else:
             actions = ["Campus overview", "Show all departments", "Count students"]
-
     return actions[:3]

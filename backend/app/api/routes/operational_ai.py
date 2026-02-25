@@ -21,12 +21,16 @@ from app.schemas.schemas import (
     OperationalPlanResponse,
     OperationalRollbackRequest,
     OperationalRollbackResponse,
+    OpsStatsResponse,
+    PendingApprovalItem,
 )
 from app.services.conversational_ops_service import (
     add_approval_decision,
     create_operational_plan,
     execute_operational_plan,
     get_audit_history,
+    get_ops_stats,
+    get_pending_approvals,
     rollback_execution,
 )
 
@@ -121,3 +125,22 @@ async def audit_history(
         end_date=end_date,
         limit=limit,
     )
+
+
+@router.get("/pending", response_model=list[PendingApprovalItem])
+async def pending_approvals(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all plans awaiting senior approval. Admin-only; non-admins receive empty list."""
+    return await get_pending_approvals(db=db, user=current_user)
+
+
+@router.get("/stats", response_model=OpsStatsResponse)
+async def ops_stats(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return aggregate operation statistics for the governance dashboard."""
+    result = await get_ops_stats(db=db, user=current_user)
+    return OpsStatsResponse(**result)

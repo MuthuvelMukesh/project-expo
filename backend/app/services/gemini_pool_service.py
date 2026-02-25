@@ -91,3 +91,70 @@ class GeminiPoolClient:
 
         log.warning("Gemini pool exhausted for module=%s code=%s", module, code)
         raise GeminiPoolError(code=code, message=msg, retry_eta_seconds=retry_eta)
+
+    @staticmethod
+    async def generate_text(
+        module: str,
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.4,
+        timeout: float = 30.0,
+    ) -> str:
+        """
+        Generate a conversational (prose) response via Gemini.
+        Returns the response text string.
+        Raises GeminiPoolError if all keys are exhausted.
+        """
+        keys = GeminiPoolClient._module_keys(module)
+        if not keys:
+            raise GeminiPoolError(
+                code="NO_KEYS_CONFIGURED",
+                message=f"No Gemini keys configured for module '{module}'.",
+                retry_eta_seconds=settings.GEMINI_RETRY_ETA_SECONDS,
+            )
+
+        last_status: Optional[int] = None
+        for key in keys:
+            endpoint = (
+                f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
+                f"?key={key}"
+            )
+            payload = {
+                "systemInstruction": {"parts": [{"text": system_prompt}]},
+                "contents": [{"role": "user", "parts": [{"text": user_message}]}],
+                "generationConfig": {"temperature": temperature},
+            }
+
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(endpoint, json=payload)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    candidates = data.get("candidates") or []
+                    if not candidates:
+                        continue
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    text = "".join(p.get("text", "") for p in parts).strip()
+                    if text:
+                        return text
+                    continue
+
+                last_status = response.status_code
+                if response.status_code in (429, 500, 502, 503, 504):
+                    continue
+
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError):
+                continue
+            except Exception:
+                continue
+
+        retry_eta = settings.GEMINI_RETRY_ETA_SECONDS
+        code = "RATE_LIMITED" if last_status == 429 else "SERVICE_UNAVAILABLE"
+        msg = (
+            "All Gemini keys for this module are rate-limited."
+            if last_status == 429
+            else "Gemini service unavailable for this module."
+        )
+        log.warning("Gemini text pool exhausted for module=%s code=%s", module, code)
+        raise GeminiPoolError(code=code, message=msg, retry_eta_seconds=retry_eta)

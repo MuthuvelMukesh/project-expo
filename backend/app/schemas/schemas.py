@@ -456,6 +456,42 @@ class AuditHistoryItem(BaseModel):
     created_at: Optional[str] = None
 
 
+class PendingApprovalItem(BaseModel):
+    plan_id: str
+    user_id: int
+    requester_name: str
+    module: str
+    message: str
+    intent_type: str
+    entity: str
+    risk_level: str
+    estimated_impact_count: int
+    requires_2fa: bool
+    created_at: Optional[str] = None
+
+
+class OpsModuleStat(BaseModel):
+    module: str
+    total: int
+    executed: int
+    failed: int
+    rolled_back: int
+
+
+class OpsRiskStat(BaseModel):
+    risk_level: str
+    count: int
+
+
+class OpsStatsResponse(BaseModel):
+    total_plans: int
+    awaiting_approval: int
+    executed_today: int
+    failed_total: int
+    by_risk: List[OpsRiskStat]
+    by_module: List[OpsModuleStat]
+
+
 # ─── Department Management ───────────────────────────────────────
 
 class DepartmentCreate(BaseModel):

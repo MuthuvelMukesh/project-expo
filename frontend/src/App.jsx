@@ -5,6 +5,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import FacultyConsole from './pages/FacultyConsole';
 import AdminPanel from './pages/AdminPanel';
 import CopilotPanel from './pages/CopilotPanel';
+import GovernanceDashboard from './pages/GovernanceDashboard';
 import UserManagement from './pages/UserManagement';
 import CourseManagement from './pages/CourseManagement';
 import DepartmentManagement from './pages/DepartmentManagement';
@@ -61,6 +62,7 @@ export default function App() {
                     <Route path="/manage-departments" element={<ProtectedRoute allowedRoles={['admin']}><DepartmentManagement /></ProtectedRoute>} />
                     <Route path="/hr" element={<ProtectedRoute allowedRoles={['admin']}><HRManagement /></ProtectedRoute>} />
                     <Route path="/copilot" element={<ProtectedRoute allowedRoles={['student', 'faculty', 'admin']}><CopilotPanel /></ProtectedRoute>} />
+                    <Route path="/governance" element={<ProtectedRoute allowedRoles={['admin']}><GovernanceDashboard /></ProtectedRoute>} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </AuthProvider>

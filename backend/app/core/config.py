@@ -24,22 +24,17 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     
-    # Ollama (Local LLM)
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "gemma:2b"
-
-    # LLM Provider (ollama | google)
-    LLM_PROVIDER: str = "ollama"
+    # Google Gemini — primary key (fallback when module pools are empty)
     GOOGLE_API_KEY: str = ""
     GOOGLE_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
     GOOGLE_MODEL: str = "gemini-1.5-flash"
 
-    # Conversational Ops AI (Gemini key pools)
-    GEMINI_NLP_KEYS: str = ""
-    GEMINI_PREDICTIONS_KEYS: str = ""
-    GEMINI_FINANCE_KEYS: str = ""
-    GEMINI_HR_KEYS: str = ""
-    GEMINI_CHAT_KEYS: str = ""
+    # Per-module Gemini key pools (comma-separated; each module gets rate-limit isolation)
+    GEMINI_NLP_KEYS: str = ""          # academic NLP / copilot planner
+    GEMINI_PREDICTIONS_KEYS: str = ""  # ML predictions
+    GEMINI_FINANCE_KEYS: str = ""      # finance module
+    GEMINI_HR_KEYS: str = ""           # HR / payroll module
+    GEMINI_CHAT_KEYS: str = ""         # conversational chatbot
     GEMINI_RETRY_ETA_SECONDS: int = 60
 
     # Conversational Ops Controls
