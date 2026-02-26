@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "campusiq-dev-secret-key-change-in-production"
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://campusiq:campusiq_secret@localhost:5432/campusiq"
+    DATABASE_URL: str = "postgresql+asyncpg://campusiq:campusiq_secret@127.0.0.1:5433/campusiq"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

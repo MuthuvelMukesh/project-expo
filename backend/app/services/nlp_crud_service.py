@@ -118,10 +118,11 @@ ACCESS_RULES = {
         "updatable_fields": ["section", "semester"],
     },
     "faculty": {
-        "allowed_intents": ["READ", "ANALYZE", "CREATE", "UPDATE"],
+        "allowed_intents": ["READ", "ANALYZE", "CREATE", "UPDATE", "DELETE"],
         "self_update_only": False,
-        "updatable_entities": ["attendance", "course"],
-        "creatable_entities": ["attendance"],
+        "updatable_entities": ["student", "attendance", "course", "prediction"],
+        "creatable_entities": ["attendance", "prediction"],
+        "deletable_entities": ["attendance"],
     },
     "admin": {
         "allowed_intents": ["READ", "ANALYZE", "CREATE", "UPDATE", "DELETE"],
@@ -144,10 +145,15 @@ def _check_access(user_role: str, intent: str, entity: str) -> tuple[bool, str]:
         if allowed is not None and entity not in allowed:
             return False, f"❌ As a **{user_role}**, you cannot create **{entity}** records."
 
-    if intent in ("UPDATE", "DELETE"):
+    if intent in ("UPDATE",):
         allowed = rules.get("updatable_entities")
         if allowed is not None and entity not in allowed:
             return False, f"❌ As a **{user_role}**, you cannot modify **{entity}** records."
+
+    if intent in ("DELETE",):
+        allowed = rules.get("deletable_entities", rules.get("updatable_entities"))
+        if allowed is not None and entity not in allowed:
+            return False, f"❌ As a **{user_role}**, you cannot delete **{entity}** records."
 
     return True, ""
 
@@ -724,11 +730,15 @@ def _apply_filters(stmt, model, entity: str, filters: dict):
         elif key == "semester" and hasattr(model, "semester"):
             stmt = stmt.where(model.semester == value)
 
-        # CGPA filters
-        elif key == "cgpa_lt" and entity == "student":
+        # CGPA filters (support both cgpa_lt and cgpa__lt formats)
+        elif key in ("cgpa_lt", "cgpa__lt") and entity == "student":
             stmt = stmt.where(Student.cgpa < value)
-        elif key == "cgpa_gt" and entity == "student":
+        elif key in ("cgpa_gt", "cgpa__gt") and entity == "student":
             stmt = stmt.where(Student.cgpa > value)
+        elif key in ("cgpa_lte", "cgpa__lte") and entity == "student":
+            stmt = stmt.where(Student.cgpa <= value)
+        elif key in ("cgpa_gte", "cgpa__gte") and entity == "student":
+            stmt = stmt.where(Student.cgpa >= value)
 
         # ID filter
         elif key == "id":

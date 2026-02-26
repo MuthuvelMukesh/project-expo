@@ -1,3 +1,10 @@
+# ============================================================
+# Docker Compose - Services Only (Local Development)
+# ============================================================
+# This configuration runs ONLY PostgreSQL and Redis in Docker
+# Backend and Frontend run locally for faster development
+# ============================================================
+
 services:
   # ── PostgreSQL Database ──────────────────────
   db:
@@ -28,58 +35,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ── FastAPI Backend ──────────────────────────
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: campusiq-backend
-    environment:
-      DATABASE_URL: postgresql+asyncpg://campusiq:campusiq_secret@db:5432/campusiq
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: campusiq-hackathon-secret-key-change-in-production
-      # Google Gemini — primary key
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      GOOGLE_BASE_URL: ${GOOGLE_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
-      GOOGLE_MODEL: ${GOOGLE_MODEL:-gemini-1.5-flash}
-      # Per-module Gemini key pools
-      GEMINI_NLP_KEYS: ${GEMINI_NLP_KEYS:-}
-      GEMINI_PREDICTIONS_KEYS: ${GEMINI_PREDICTIONS_KEYS:-}
-      GEMINI_FINANCE_KEYS: ${GEMINI_FINANCE_KEYS:-}
-      GEMINI_HR_KEYS: ${GEMINI_HR_KEYS:-}
-      GEMINI_CHAT_KEYS: ${GEMINI_CHAT_KEYS:-}
-      GEMINI_RETRY_ETA_SECONDS: ${GEMINI_RETRY_ETA_SECONDS:-60}
-      MODEL_PATH: app/ml/models
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./backend:/app
-    command: >
-      sh -c "python -m app.seed_db &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
-
-  # ── React Frontend ──────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: campusiq-frontend
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
-    environment:
-      - VITE_API_PROXY_TARGET=http://backend:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0 --port 5173
 
 volumes:
   postgres_data:

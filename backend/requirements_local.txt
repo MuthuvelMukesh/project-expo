@@ -1,0 +1,54 @@
+# ============================================================
+# Python Requirements - Local Development (Flexible Versions)
+# ============================================================
+# This file uses flexible version constraints to avoid 
+# compilation issues on Windows by using pre-built wheels
+# ============================================================
+
+# Core
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-dotenv>=1.0.1
+
+# Database
+sqlalchemy[asyncio]>=2.0.25
+asyncpg>=0.29.0
+alembic>=1.13.1
+
+# Validation
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+
+# Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+
+# AI/ML (flexible versions to use pre-built wheels)
+scikit-learn>=1.4.0
+xgboost>=2.0.3
+shap>=0.44.1
+pandas>=2.2.0
+numpy>=1.26.3,<3.0.0
+joblib>=1.3.2
+
+# LLM Integration
+langchain>=0.1.4
+langchain-community>=0.0.14
+
+# Task Queue
+celery>=5.3.6
+redis>=5.0.1
+
+# Utilities
+httpx[http2]>=0.26.0
+qrcode[pil]>=7.4.2
+aiofiles>=23.2.1
+
+# Testing
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+pytest-cov>=4.1.0
+
+# Logging
+python-json-logger>=2.0.7

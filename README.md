@@ -2,11 +2,59 @@
 
 > An autonomous, AI-powered campus management system that **predicts**, **adapts**, and **automates** — turning raw campus data into intelligent decisions through natural language.
 
-![Status](https://img.shields.io/badge/status-hackathon%20MVP-brightgreen)
+![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![AI](https://img.shields.io/badge/AI-XGBoost%20%2B%20SHAP-purple)
 ![Stack](https://img.shields.io/badge/stack-React%20%2B%20FastAPI-orange)
 ![LLM](https://img.shields.io/badge/LLM-Google%20Gemini-blue)
+![Deployment](https://img.shields.io/badge/deployment-single%20server-success)
+
+---
+
+## 🚀 Quick Start (Single Server)
+
+**Both frontend and backend are now combined into ONE server!**
+
+### Prerequisites
+- **Google Gemini API Key** (FREE) - Get it here: https://aistudio.google.com/app/apikey
+- Docker (for containerized deployment) OR Python 3.11+ and Node.js 18+
+
+### Setup Steps
+
+1. **Get your Gemini API key** (required for AI features):
+   ```powershell
+   # Visit: https://aistudio.google.com/app/apikey
+   # Copy your API key
+   ```
+
+2. **Configure API key**:
+   ```powershell
+   # Edit .env file in project root
+   notepad .env
+   
+   # Add your key:
+   GOOGLE_API_KEY=AIzaSy_YOUR_API_KEY_HERE
+   ```
+
+3. **Test API connection** (optional but recommended):
+   ```powershell
+   .\test_gemini_api.ps1
+   ```
+
+4. **Start the application**:
+   ```powershell
+   # Windows: Just run this!
+   .\start_production.ps1
+
+   # Or use Docker:
+   docker-compose -f docker-compose.production.yml up --build
+   ```
+
+**Access everything on http://localhost:8000** 🎉
+
+📖 See [QUICK_START.md](QUICK_START.md) for detailed instructions.  
+🔑 See [GEMINI_API_SETUP.md](GEMINI_API_SETUP.md) for API configuration help.  
+⚡ See [OPTIMIZATION_REPORT.md](OPTIMIZATION_REPORT.md) for performance details.
 
 ---
 
@@ -30,16 +78,37 @@ CampusIQ is an **AI-first college ERP** that replaces form-driven campus managem
 
 ## Architecture
 
+### Single Server Deployment (Production)
+
+```
+┌──────────────────────────────────────────────┐
+│         Single Server (Port 8000)           │
+│  ┌────────────────────────────────────────┐ │
+│  │  FastAPI Backend (serves API + UI)     │ │
+│  │  ├─ API Routes (/api/*)                │ │
+│  │  ├─ AI/ML Pipeline (XGBoost + SHAP)    │ │
+│  │  └─ Serves React Frontend (/)          │ │
+│  └────────────────────────────────────────┘ │
+└──────────────────────────────────────────────┘
+              ↓                ↓
+     ┌────────────────┐  ┌────────────┐
+     │  PostgreSQL    │  │   Redis    │
+     │  + Redis       │  │   Cache    │
+     └────────────────┘  └────────────┘
+              ↓
+     ┌────────────────┐
+     │  Gemini LLM    │
+     │   Key Pool     │
+     └────────────────┘
+```
+
+### Development Mode (Optional)
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌───────────────────┐
 │  React Frontend │────▶│  FastAPI Backend  │────▶│  AI/ML Pipeline   │
 │  (Vite + SPA)   │     │  (REST API)       │     │  (XGBoost + SHAP) │
 └─────────────────┘     └──────────────────┘     └───────────────────┘
-                                │                        │
-                         ┌──────┴──────┐          ┌──────┴──────┐
-                         │ PostgreSQL  │          │   Gemini    │
-                         │ + Redis     │          │ Key  Pool   │
-                         └─────────────┘          └─────────────┘
+    Port 5173                Port 8000
 ```
 
 ### AI Stack

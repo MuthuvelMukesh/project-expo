@@ -1,5 +1,6 @@
 """
 Gemini key-pool client with graceful degradation and retry failover.
+Optimized with connection pooling and improved error handling.
 """
 
 import logging
@@ -11,6 +12,29 @@ from app.core.config import get_settings
 
 settings = get_settings()
 log = logging.getLogger("campusiq.gemini_pool")
+
+# Shared HTTP client with connection pooling for better performance
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    """Get or create a shared HTTP client with connection pooling."""
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+            http2=True,  # Enable HTTP/2 for better performance
+        )
+    return _http_client
+
+
+async def close_http_client():
+    """Close the shared HTTP client. Call this on app shutdown."""
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
 
 
 class GeminiPoolError(Exception):
@@ -44,6 +68,8 @@ class GeminiPoolClient:
             )
 
         last_status: Optional[int] = None
+        client = _get_http_client()
+        
         for key in keys:
             endpoint = (
                 f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
@@ -56,12 +82,11 @@ class GeminiPoolClient:
                     ]
                 },
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.1},
+                "generationConfig": {"temperature": 0.1, "topP": 0.95, "topK": 40},
             }
 
             try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.post(endpoint, json=payload)
+                response = await client.post(endpoint, json=payload, timeout=timeout)
 
                 if response.status_code == 200:
                     data = response.json()
@@ -78,7 +103,8 @@ class GeminiPoolClient:
 
             except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError):
                 continue
-            except Exception:
+            except Exception as e:
+                log.debug(f"Unexpected error with key in module '{module}': {e}")
                 continue
 
         retry_eta = settings.GEMINI_RETRY_ETA_SECONDS
@@ -114,6 +140,8 @@ class GeminiPoolClient:
             )
 
         last_status: Optional[int] = None
+        client = _get_http_client()
+        
         for key in keys:
             endpoint = (
                 f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
@@ -122,12 +150,16 @@ class GeminiPoolClient:
             payload = {
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
                 "contents": [{"role": "user", "parts": [{"text": user_message}]}],
-                "generationConfig": {"temperature": temperature},
+                "generationConfig": {
+                    "temperature": temperature, 
+                    "topP": 0.95, 
+                    "topK": 40,
+                    "maxOutputTokens": 1024,
+                },
             }
 
             try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    response = await client.post(endpoint, json=payload)
+                response = await client.post(endpoint, json=payload, timeout=timeout)
 
                 if response.status_code == 200:
                     data = response.json()
@@ -146,7 +178,8 @@ class GeminiPoolClient:
 
             except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError):
                 continue
-            except Exception:
+            except Exception as e:
+                log.debug(f"Unexpected error with key in module '{module}': {e}")
                 continue
 
         retry_eta = settings.GEMINI_RETRY_ETA_SECONDS

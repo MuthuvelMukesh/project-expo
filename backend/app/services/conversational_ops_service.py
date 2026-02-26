@@ -80,9 +80,9 @@ ROLE_MATRIX = {
     "faculty": {
         "READ": {"student", "course", "department", "attendance", "prediction"},
         "ANALYZE": {"student", "course", "attendance", "prediction"},
-        "CREATE": {"attendance"},
-        "UPDATE": {"attendance", "course"},
-        "DELETE": set(),
+        "CREATE": {"attendance", "prediction"},
+        "UPDATE": {"student", "attendance", "course", "prediction"},
+        "DELETE": {"attendance"},
     },
     "admin": {
         "READ": set(ENTITY_REGISTRY.keys()),
@@ -143,9 +143,20 @@ def _keyword_intent(message: str) -> dict:
     if sem_match:
         filters["semester"] = int(sem_match.group(1))
 
-    cgpa_match = re.search(r"cgpa\s*(?:to|=)\s*([\d.]+)", msg)
-    if cgpa_match:
-        values["cgpa"] = float(cgpa_match.group(1))
+    # CGPA comparisons
+    cgpa_below = re.search(r"cgpa\s+(?:below|less than|under|<)\s+([\d.]+)", msg)
+    cgpa_above = re.search(r"cgpa\s+(?:above|greater than|over|>)\s+([\d.]+)", msg)
+    cgpa_equals = re.search(r"cgpa\s*(?:to|=|equals?|is)\s*([\d.]+)", msg)
+    
+    if cgpa_below and intent == "READ":
+        filters["cgpa__lt"] = float(cgpa_below.group(1))
+    elif cgpa_above and intent == "READ":
+        filters["cgpa__gt"] = float(cgpa_above.group(1))
+    elif cgpa_equals:
+        if intent == "READ":
+            filters["cgpa"] = float(cgpa_equals.group(1))
+        else:
+            values["cgpa"] = float(cgpa_equals.group(1))
 
     confidence = 0.62
     ambiguity = []
@@ -178,12 +189,19 @@ Extract a strict JSON object for ERP operations from this user message.
 Return keys exactly:
 intent: READ|CREATE|UPDATE|DELETE|ANALYZE|ESCALATE
 entity: canonical lowercase singular entity
-filters: object
+filters: object (for numeric comparisons use field__lt, field__lte, field__gt, field__gte, field__eq suffixes. Examples: {{"cgpa__lt": 7.0}}, {{"semester__gte": 4}})
 scope: object
 affected_fields: array of strings
 values: object
 confidence: float between 0 and 1
 ambiguity: {{is_ambiguous: boolean, fields: array[string], question: string|null}}
+
+Comparison operators:
+- For "below", "less than", "under": use field__lt (e.g., cgpa__lt: 7.0)
+- For "above", "greater than", "over": use field__gt (e.g., cgpa__gt: 6.0)
+- For "at most", "up to": use field__lte
+- For "at least": use field__gte
+- For exact match: use field or field__eq
 
 Message: {message}
 """
@@ -337,7 +355,38 @@ def _apply_filters(stmt, model, entity: str, filters: dict):
         return stmt
 
     for key, value in filters.items():
-        if key == "id" and hasattr(model, "id"):
+        # Handle comparison operators (field__lt, field__gt, field_lt, field_gt, etc.)
+        # Support both double underscore (Django-style) and single underscore formats
+        if "__" in key or any(key.endswith(f"_{op}") for op in ["lt", "lte", "gt", "gte", "eq", "ne"]):
+            # Try double underscore first
+            if "__" in key:
+                field_name, operator = key.rsplit("__", 1)
+            # Fallback to single underscore
+            else:
+                for op in ["lte", "gte", "lt", "gt", "eq", "ne"]:
+                    if key.endswith(f"_{op}"):
+                        field_name = key[:-len(op)-1]
+                        operator = op
+                        break
+                else:
+                    field_name = key
+                    operator = None
+            
+            if operator and hasattr(model, field_name):
+                field = getattr(model, field_name)
+                if operator == "lt":
+                    stmt = stmt.where(field < value)
+                elif operator == "lte":
+                    stmt = stmt.where(field <= value)
+                elif operator == "gt":
+                    stmt = stmt.where(field > value)
+                elif operator == "gte":
+                    stmt = stmt.where(field >= value)
+                elif operator == "eq":
+                    stmt = stmt.where(field == value)
+                elif operator == "ne":
+                    stmt = stmt.where(field != value)
+        elif key == "id" and hasattr(model, "id"):
             stmt = stmt.where(model.id == int(value))
         elif key == "semester" and hasattr(model, "semester"):
             stmt = stmt.where(model.semester == int(value))
