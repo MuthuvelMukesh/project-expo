@@ -120,23 +120,32 @@ def prepare_single_record(record: dict) -> pd.DataFrame:
 
 def compute_features_from_db(
     attendance_pct: float,
-    assignment_submission_rate: float = 75.0,
-    assignment_avg_score: float = 65.0,
-    quiz_avg: float = 60.0,
-    lab_pct: float = 70.0,
-    midterm_score: float = 55.0,
-    cgpa: float = 7.0,
-    study_hours_per_week: int = 10,
+    cgpa: float,
+    assignment_submission_rate: float = None,
+    assignment_avg_score: float = None,
+    quiz_avg: float = None,
+    lab_pct: float = None,
+    midterm_score: float = None,
+    study_hours_per_week: int = None,
     credits: int = 4,
     has_scholarship: bool = False,
-    extracurricular_hours: int = 5,
-    commute_time_mins: int = 30,
+    extracurricular_hours: int = None,
+    commute_time_mins: int = None,
 ) -> dict:
     """
     Construct a feature dict from individual values.
-    Useful for real-time inference from database fields.
+    Tracks which features have real data vs unavailable (None).
+    
+    Real data (always available):
+    - attendance_pct: From Attendance table
+    - cgpa: From Student table
+    
+    Planned for v2 (tables not yet implemented):
+    - assignment_submission_rate, assignment_avg_score
+    - quiz_avg, lab_pct, midterm_score
+    - study_hours_per_week, extracurricular_hours, commute_time_mins
     """
-    return {
+    features = {
         "attendance_pct": attendance_pct,
         "assignment_submission_rate": assignment_submission_rate,
         "assignment_avg_score": assignment_avg_score,
@@ -146,7 +155,19 @@ def compute_features_from_db(
         "cgpa": cgpa,
         "study_hours_per_week": study_hours_per_week,
         "credits": credits,
-        "has_scholarship": int(has_scholarship),
+        "has_scholarship": int(has_scholarship) if has_scholarship is not None else 0,
         "extracurricular_hours": extracurricular_hours,
         "commute_time_mins": commute_time_mins,
+    }
+    
+    # Track missing features
+    missing = [k for k, v in features.items() if v is None and k not in ("has_scholarship",)]
+    total_features = len(FEATURE_COLS)
+    available_features = total_features - len(missing)
+    
+    return {
+        "features": features,
+        "missing_features": missing,
+        "data_completeness": available_features / total_features,
+        "is_estimated": len(missing) > 0,
     }

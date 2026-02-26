@@ -213,6 +213,11 @@ class ChatQuery(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    data_query: bool = False
+    context_used: bool = False
+    redirect_to_console: bool = False
+    suggested_command: Optional[str] = None
+    data: Optional[List[dict]] = None
     sources: Optional[List[str]] = None
     suggested_actions: Optional[List[str]] = None
 

@@ -1,10 +1,3 @@
-# ============================================================
-# Docker Compose - Services Only (Local Development)
-# ============================================================
-# This configuration runs ONLY PostgreSQL and Redis in Docker
-# Backend and Frontend run locally for faster development
-# ============================================================
-
 services:
   # ── PostgreSQL Database ──────────────────────
   db:
@@ -35,6 +28,49 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ── FastAPI Backend ──────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: campusiq-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://campusiq:campusiq_secret@db:5432/campusiq
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: campusiq-hackathon-secret-key-change-in-production
+      MODEL_PATH: app/ml/models
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "python -m app.seed_db &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # ── React Frontend ──────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: campusiq-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 5173
 
 volumes:
   postgres_data:

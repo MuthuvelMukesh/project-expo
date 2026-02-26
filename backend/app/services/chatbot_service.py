@@ -42,6 +42,83 @@ def _is_data_query(message: str) -> bool:
     return bool(_CRUD_RE.search(message))
 
 
+# ─── Write operation detection ─────────────────────────────────
+
+_WRITE_VERB_PATTERNS = [
+    r'\b(add|create|insert)\b.+\b(student|faculty|course|user)s?\b',
+    r'\b(update|modify|change|set|edit)\b.+\b(student|faculty|course|semester|cgpa|grade)s?\b',
+    r'\b(delete|remove|drop)\b.+\b(student|faculty|course|user|record)s?\b',
+    r'\b(mark|record)\b.+\battendance\b',
+    r'\b(promote|transfer|move)\b.+\b(student)s?\b',
+]
+
+
+def _is_write_query(message: str) -> bool:
+    """Return True if the message contains write operation verbs."""
+    msg = message.lower()
+    return any(re.search(p, msg) for p in _WRITE_VERB_PATTERNS)
+
+
+# ─── Intent guard for chatbot CRUD calls ───────────────────────
+
+async def _intent_guard(
+    message: str,
+    user_role: str,
+    user_id: int,
+    db: AsyncSession
+) -> dict:
+    """
+    Wraps nlp_crud calls from the chatbot.
+    Ensures only READ and ANALYZE operations execute.
+    Any write intent detected is redirected to Command Console.
+    """
+    try:
+        result = await process_nlp_crud(message, user_role, user_id, db)
+    except Exception as e:
+        log.warning("NLP CRUD error in intent guard: %s", e)
+        return {
+            "response": "I had trouble understanding that query. Try rephrasing it.",
+            "redirect_to_console": False,
+            "data_query": True,
+            "context_used": False
+        }
+
+    detected_intent = result.get("intent", "READ")
+
+    if detected_intent in {"UPDATE", "CREATE", "DELETE"}:
+        return {
+            "response": (
+                "That looks like a write operation. I can only read and display data. "
+                "Please use the Command Console to make changes."
+            ),
+            "redirect_to_console": True,
+            "suggested_command": message,
+            "data_query": False,
+            "context_used": False
+        }
+
+    # Format response for READ/ANALYZE
+    response_text = result.get("summary", "Here is what I found.")
+    raw_data = (result.get("result") or {}).get("data")
+    if raw_data and len(raw_data) > 0:
+        headers = list(raw_data[0].keys())
+        table = [" | ".join(headers), " | ".join(["---"] * len(headers))]
+        for row in raw_data[:20]:
+            table.append(" | ".join(str(row.get(h, "")) for h in headers))
+        response_text += "\n\n" + "\n".join(table)
+        if len(raw_data) > 20:
+            response_text += f"\n\n*...and {len(raw_data) - 20} more records*"
+
+    return {
+        "response": response_text,
+        "data": raw_data,
+        "redirect_to_console": False,
+        "data_query": True,
+        "context_used": False,
+        "sources": ["CampusIQ Data Engine"],
+    }
+
+
 # ─── User context builder ──────────────────────────────────────
 
 async def _build_user_context(user_id: int, user_role: str, db: AsyncSession) -> str:
@@ -165,52 +242,49 @@ async def process_query(
 ) -> dict:
     """Process a natural language query using the NLP CRUD engine or Gemini chat."""
 
-    # 1. Route clear data commands to the NLP CRUD engine
-    if db and _is_data_query(message):
-        try:
-            crud_result = await process_nlp_crud(
-                message=message,
-                user_role=user_role,
-                user_id=user_id,
-                db=db,
-            )
-
-            response_text = crud_result["summary"]
-            raw_data = (crud_result.get("result") or {}).get("data")
-            if raw_data and len(raw_data) > 0:
-                headers = list(raw_data[0].keys())
-                table = [" | ".join(headers), " | ".join(["---"] * len(headers))]
-                for row in raw_data[:20]:
-                    table.append(" | ".join(str(row.get(h, "")) for h in headers))
-                response_text += "\n\n" + "\n".join(table)
-                if len(raw_data) > 20:
-                    response_text += f"\n\n*...and {len(raw_data) - 20} more records*"
-
-            return {
-                "response": response_text,
-                "sources": ["CampusIQ Data Engine"],
-                "suggested_actions": _get_data_actions(crud_result),
-            }
-        except Exception as e:
-            log.error("NLP CRUD engine failed: %s", e, exc_info=True)
-
-    # 2. Build user-specific context for Gemini
-    user_context = "No session context available."
-    if db:
-        user_context = await _build_user_context(user_id, user_role, db)
-
-    # 3. Query Gemini
-    llm_response = await _query_gemini(message, user_role, user_context)
-    if llm_response:
+    # GATE 1: Detect write operations before anything else
+    if _is_write_query(message):
         return {
-            "response": llm_response,
-            "sources": ["CampusIQ AI (Gemini)"],
-            "suggested_actions": _get_suggested_actions(message, user_role),
+            "response": (
+                "I can't make changes directly. "
+                "Please use the Command Console for creating, updating, "
+                "or deleting records."
+            ),
+            "redirect_to_console": True,
+            "suggested_command": message,
+            "data_query": False,
+            "context_used": False
         }
 
-    # 4. Rule-based fallback — no LLM dependency
+    # GATE 2: Route read data queries through the intent guard
+    if db and _is_data_query(message):
+        return await _intent_guard(message, user_role, user_id, db)
+
+    # GATE 3: Conversational query — build context and call LLM
+    try:
+        user_context = "No session context available."
+        if db:
+            user_context = await _build_user_context(user_id, user_role, db)
+
+        llm_response = await _query_gemini(message, user_role, user_context)
+        if llm_response:
+            return {
+                "response": llm_response,
+                "redirect_to_console": False,
+                "data_query": False,
+                "context_used": True,
+                "sources": ["CampusIQ AI (Gemini)"],
+                "suggested_actions": _get_suggested_actions(message, user_role),
+            }
+    except Exception as e:
+        log.warning("LLM query failed: %s", e)
+
+    # GATE 4: Rule-based fallback — no LLM dependency
     return {
         "response": _rule_based_response(message, user_role),
+        "redirect_to_console": False,
+        "data_query": False,
+        "context_used": False,
         "sources": ["CampusIQ Knowledge Base"],
         "suggested_actions": _get_suggested_actions(message, user_role),
     }

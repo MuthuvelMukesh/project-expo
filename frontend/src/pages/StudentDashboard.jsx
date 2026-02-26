@@ -256,10 +256,32 @@ export default function StudentDashboard() {
                                         }}>
                                             {pred.predicted_grade}
                                         </span>
+                                        {pred.is_estimated && (
+                                            <div style={{ marginTop: 4 }}>
+                                                <span style={{
+                                                    background: 'rgba(245, 158, 11, 0.15)',
+                                                    color: '#F59E0B',
+                                                    fontSize: '0.65rem',
+                                                    fontWeight: 500,
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4,
+                                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                                }} title="This prediction uses partial data. Accuracy improves when assignment, quiz, and lab records are available.">
+                                                    Estimated ⓘ
+                                                </span>
+                                            </div>
+                                        )}
                                     </td>
                                     <td>{Math.round(pred.risk_score * 100)}%</td>
                                     <td><span className={`risk-badge ${pred.risk_level}`}>{pred.risk_level}</span></td>
-                                    <td>{Math.round(pred.confidence * 100)}%</td>
+                                    <td>
+                                        {Math.round(pred.confidence * 100)}%
+                                        {pred.is_estimated && pred.data_completeness < 1 && (
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                                Data: {Math.round(pred.data_completeness * 100)}%
+                                            </div>
+                                        )}
+                                    </td>
                                     <td>
                                         {pred.top_factors?.[0] && (
                                             <span style={{ fontSize: '0.8rem' }}>

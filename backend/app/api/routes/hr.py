@@ -18,7 +18,7 @@ from app.models.models import (
 from app.core.database import get_db
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/hr", tags=["HR & Payroll"])
+router = APIRouter()
 
 
 # ─── Schemas ────────────────────────────────────────────────────

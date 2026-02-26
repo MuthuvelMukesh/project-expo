@@ -3,12 +3,14 @@ CampusIQ — Auth Routes
 Registration, login, password reset, and current user endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import secrets
 
 from app.core.database import get_db
+from app.core.config import get_settings
 from app.api.dependencies import get_current_user
 from app.models.models import User
 from app.schemas.schemas import (
@@ -35,10 +37,31 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
     return await register_user(db, data)
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login")
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
-    """Authenticate and return a JWT token."""
-    return await authenticate_user(db, data)
+    """Authenticate and return a JWT token via httpOnly cookie."""
+    token_data = await authenticate_user(db, data)
+    settings = get_settings()
+    
+    response = JSONResponse(content={"status": "ok", "message": "Login successful"})
+    response.set_cookie(
+        key="access_token",
+        value=token_data.access_token,
+        httponly=True,
+        secure=not settings.DEBUG,  # True in production (HTTPS)
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    return response
+
+
+@router.post("/logout")
+async def logout():
+    """Clear the auth cookie."""
+    response = JSONResponse(content={"status": "ok", "message": "Logged out"})
+    response.delete_cookie(key="access_token", path="/")
+    return response
 
 
 @router.get("/me", response_model=UserOut)

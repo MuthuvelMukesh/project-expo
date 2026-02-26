@@ -3,6 +3,7 @@
  * Full ops-ai integration: NL → Plan → Risk → Approval → Execute → Audit
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import api from '../services/api';
@@ -154,6 +155,7 @@ function DiffRow({ before, after, field }) {
 
 export default function CopilotPanel() {
     const { user } = useAuth();
+    const location = useLocation();
 
     // Input state
     const [input, setInput] = useState('');
@@ -186,6 +188,16 @@ export default function CopilotPanel() {
 
     const inputRef = useRef(null);
     const stepTimerRef = useRef(null);
+
+    // Prefill input if navigating from ChatWidget with a suggested command
+    useEffect(() => {
+        if (location.state?.prefill) {
+            setInput(location.state.prefill);
+            inputRef.current?.focus();
+            // Clear the state so back navigation doesn't re-prefill
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
 
     // Auto-select all affected records on plan load
     useEffect(() => {

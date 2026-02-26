@@ -331,15 +331,14 @@ project-expo/
 │   ├── app/
 │   │   ├── services/
 │   │   │   ├── gemini_pool_service.py   # Key pool: generate_json + generate_text
-│   │   │   ├── copilot_service.py       # Action planning + risk classification
 │   │   │   ├── nlp_crud_service.py      # Intent detection + CRUD execution
 │   │   │   ├── chatbot_service.py       # Context-aware Gemini chat
-│   │   │   ├── conversational_ops_service.py  # Ops AI core + audit
+│   │   │   ├── conversational_ops_service.py  # Primary AI ops + audit
 │   │   │   ├── attendance_service.py
 │   │   │   └── prediction_service.py
 │   │   ├── api/routes/
 │   │   │   ├── operational_ai.py        # /ops-ai/* endpoints
-│   │   │   ├── copilot.py
+│   │   │   ├── copilot.py               # Legacy compatibility (uses conversational_ops)
 │   │   │   └── chatbot.py
 │   │   ├── models/models.py
 │   │   ├── core/config.py               # Gemini key pool config

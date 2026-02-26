@@ -118,11 +118,10 @@ ACCESS_RULES = {
         "updatable_fields": ["section", "semester"],
     },
     "faculty": {
-        "allowed_intents": ["READ", "ANALYZE", "CREATE", "UPDATE", "DELETE"],
+        "allowed_intents": ["READ", "ANALYZE", "CREATE", "UPDATE"],
         "self_update_only": False,
-        "updatable_entities": ["student", "attendance", "course", "prediction"],
-        "creatable_entities": ["attendance", "prediction"],
-        "deletable_entities": ["attendance"],
+        "updatable_entities": ["attendance", "course"],
+        "creatable_entities": ["attendance"],
     },
     "admin": {
         "allowed_intents": ["READ", "ANALYZE", "CREATE", "UPDATE", "DELETE"],
@@ -145,15 +144,10 @@ def _check_access(user_role: str, intent: str, entity: str) -> tuple[bool, str]:
         if allowed is not None and entity not in allowed:
             return False, f"❌ As a **{user_role}**, you cannot create **{entity}** records."
 
-    if intent in ("UPDATE",):
+    if intent in ("UPDATE", "DELETE"):
         allowed = rules.get("updatable_entities")
         if allowed is not None and entity not in allowed:
             return False, f"❌ As a **{user_role}**, you cannot modify **{entity}** records."
-
-    if intent in ("DELETE",):
-        allowed = rules.get("deletable_entities", rules.get("updatable_entities"))
-        if allowed is not None and entity not in allowed:
-            return False, f"❌ As a **{user_role}**, you cannot delete **{entity}** records."
 
     return True, ""
 
@@ -162,28 +156,41 @@ def _check_access(user_role: str, intent: str, entity: str) -> tuple[bool, str]:
 
 async def detect_intent_llm(message: str) -> Optional[dict]:
     """Use Gemini to detect intent and extract structured info from a natural language message."""
-    prompt = f"""You are a database query classifier for a college ERP system called CampusIQ.
-The database has these tables: students, faculty, courses, departments, attendance, predictions, users.
+    prompt = f"""You are a database query classifier for a college ERP system.
+Tables: students, faculty, courses, departments, attendance, predictions, users.
 
-Analyze the user's message and return a JSON object with:
-- "intent": one of "READ", "CREATE", "UPDATE", "DELETE", "ANALYZE"
-- "entity": the main table being referenced (student, faculty, course, department, attendance, prediction, user)
-- "filters": object with column-value filters if any (e.g. {{"department": "Computer Science", "semester": 5}})
-- "values": object with values for CREATE/UPDATE (e.g. {{"name": "AI", "code": "CS501"}})
-- "aggregation": for ANALYZE queries, one of "count", "average", "sum", "min", "max", "group_by" or null
-- "group_by": column to group by if aggregation uses group_by, or null
-- "limit": number of results to limit to, or null
+Analyze the message and return JSON with:
+- "intent": "READ", "CREATE", "UPDATE", "DELETE", or "ANALYZE"
+- "entity": student, faculty, course, department, attendance, prediction, or user
+- "filters": object with filters. IMPORTANT FORMAT RULES:
+  - For CGPA comparisons: use "cgpa_lt" for less than, "cgpa_gt" for greater than (e.g. {{"cgpa_lt": 6.0}})
+  - For semester: use integer (e.g. {{"semester": 5}})
+  - For department: use exact name (e.g. {{"department": "Computer Science"}})
+  - NEVER use strings like "below 6.0" - always use numeric values with _lt or _gt suffix
+- "values": object for CREATE/UPDATE operations
+- "aggregation": "count", "average", "sum", "min", "max", "group_by", or null
+- "group_by": column name for grouping, or null
+- "limit": number or null
+
+Examples:
+- "students with cgpa below 6" -> {{"filters": {{"cgpa_lt": 6.0}}}}
+- "students with cgpa above 8.5" -> {{"filters": {{"cgpa_gt": 8.5}}}}
+- "count students in semester 5" -> {{"aggregation": "count", "filters": {{"semester": 5}}}}
 
 User message: "{message}"
 
-Return ONLY valid JSON, no other text."""
+Return ONLY valid JSON, no markdown, no explanation."""
 
     try:
         result = await GeminiPoolClient.generate_json(module="nlp", prompt=prompt, timeout=20.0)
         content = result.get("text", "")
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group())
+            parsed = json.loads(json_match.group())
+            # Sanitize filters
+            if "filters" in parsed and isinstance(parsed["filters"], dict):
+                parsed["filters"] = _sanitize_filters(parsed["filters"])
+            return parsed
     except GeminiPoolError as e:
         log.warning("Gemini NLP pool error in detect_intent_llm: %s (code=%s)", e.message, e.code)
     except json.JSONDecodeError as e:
@@ -192,6 +199,41 @@ Return ONLY valid JSON, no other text."""
         log.error("Unexpected error in detect_intent_llm: %s", e, exc_info=True)
 
     return None
+
+
+def _sanitize_filters(filters: dict) -> dict:
+    """Clean up LLM-generated filters to ensure proper format."""
+    sanitized = {}
+    for key, value in filters.items():
+        # Handle CGPA values that came as strings like "below 6.0"
+        if key == "cgpa" and isinstance(value, str):
+            match = re.search(r'(below|under|less|<)\s*([\d.]+)', value, re.IGNORECASE)
+            if match:
+                sanitized["cgpa_lt"] = float(match.group(2))
+                continue
+            match = re.search(r'(above|over|greater|more|>)\s*([\d.]+)', value, re.IGNORECASE)
+            if match:
+                sanitized["cgpa_gt"] = float(match.group(2))
+                continue
+            # Try to parse as direct number
+            try:
+                sanitized["cgpa"] = float(value)
+                continue
+            except (ValueError, TypeError):
+                continue  # Skip invalid cgpa filter
+        
+        # Handle semester as string
+        if key == "semester" and isinstance(value, str):
+            try:
+                sanitized["semester"] = int(re.search(r'\d+', value).group())
+                continue
+            except (ValueError, TypeError, AttributeError):
+                continue
+        
+        # Keep valid filters as-is
+        sanitized[key] = value
+    
+    return sanitized
 
 
 def detect_intent_keyword(message: str) -> dict:
@@ -716,6 +758,10 @@ def _apply_filters(stmt, model, entity: str, filters: dict):
         return stmt
 
     for key, value in filters.items():
+        # Skip None or empty values
+        if value is None or value == "":
+            continue
+            
         # Department name filter (requires join)
         if key == "department" and entity in ("student", "course", "faculty"):
             if entity == "student":
@@ -724,25 +770,39 @@ def _apply_filters(stmt, model, entity: str, filters: dict):
                 stmt = stmt.join(Department, Course.department_id == Department.id)
             elif entity == "faculty":
                 stmt = stmt.join(Department, Faculty.department_id == Department.id)
-            stmt = stmt.where(func.lower(Department.name).like(f"%{value.lower()}%"))
+            stmt = stmt.where(func.lower(Department.name).like(f"%{str(value).lower()}%"))
 
         # Semester filter
         elif key == "semester" and hasattr(model, "semester"):
-            stmt = stmt.where(model.semester == value)
+            try:
+                stmt = stmt.where(model.semester == int(value))
+            except (ValueError, TypeError):
+                pass
 
-        # CGPA filters (support both cgpa_lt and cgpa__lt formats)
-        elif key in ("cgpa_lt", "cgpa__lt") and entity == "student":
-            stmt = stmt.where(Student.cgpa < value)
-        elif key in ("cgpa_gt", "cgpa__gt") and entity == "student":
-            stmt = stmt.where(Student.cgpa > value)
-        elif key in ("cgpa_lte", "cgpa__lte") and entity == "student":
-            stmt = stmt.where(Student.cgpa <= value)
-        elif key in ("cgpa_gte", "cgpa__gte") and entity == "student":
-            stmt = stmt.where(Student.cgpa >= value)
+        # CGPA filters
+        elif key == "cgpa_lt" and entity == "student":
+            try:
+                stmt = stmt.where(Student.cgpa < float(value))
+            except (ValueError, TypeError):
+                pass
+        elif key == "cgpa_gt" and entity == "student":
+            try:
+                stmt = stmt.where(Student.cgpa > float(value))
+            except (ValueError, TypeError):
+                pass
+        elif key == "cgpa" and entity == "student":
+            # Direct cgpa match - must be numeric
+            try:
+                stmt = stmt.where(Student.cgpa == float(value))
+            except (ValueError, TypeError):
+                pass
 
         # ID filter
         elif key == "id":
-            stmt = stmt.where(model.id == int(value))
+            try:
+                stmt = stmt.where(model.id == int(value))
+            except (ValueError, TypeError):
+                pass
 
         # Roll number filter
         elif key == "roll_number" and entity == "student":
@@ -752,21 +812,32 @@ def _apply_filters(stmt, model, entity: str, filters: dict):
         elif key == "name":
             if entity in ("student", "faculty"):
                 stmt = stmt.join(User, model.user_id == User.id)
-                stmt = stmt.where(func.lower(User.full_name).like(f"%{value.lower()}%"))
+                stmt = stmt.where(func.lower(User.full_name).like(f"%{str(value).lower()}%"))
             elif hasattr(model, "name"):
-                stmt = stmt.where(func.lower(model.name).like(f"%{value.lower()}%"))
+                stmt = stmt.where(func.lower(model.name).like(f"%{str(value).lower()}%"))
 
         # Code filter
         elif key == "code" and hasattr(model, "code"):
-            stmt = stmt.where(func.lower(model.code) == value.lower())
+            stmt = stmt.where(func.lower(model.code) == str(value).lower())
 
         # Attendance below threshold
         elif key == "attendance_below":
             pass  # Complex subquery; handled separately if needed
 
-        # Direct column match
+        # Direct column match - only for safe types
         elif hasattr(model, key):
-            stmt = stmt.where(getattr(model, key) == value)
+            col = getattr(model, key)
+            col_type = str(col.type).upper()
+            # Only apply direct match for string columns or if value matches expected type
+            if "VARCHAR" in col_type or "TEXT" in col_type or "STRING" in col_type:
+                stmt = stmt.where(col == str(value))
+            elif ("INT" in col_type or "FLOAT" in col_type or "DOUBLE" in col_type or "NUMERIC" in col_type):
+                try:
+                    stmt = stmt.where(col == float(value))
+                except (ValueError, TypeError):
+                    pass  # Skip invalid numeric filter
+            elif "BOOL" in col_type:
+                stmt = stmt.where(col == bool(value))
 
     return stmt
 

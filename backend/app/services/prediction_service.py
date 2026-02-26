@@ -115,9 +115,12 @@ async def predict_student_performance(
                 "risk_level": _risk_level(saved.risk_score or 0.2),
                 "confidence": round(saved.confidence or 0.8, 2),
                 "top_factors": saved.factors or _default_factors(),
+                "is_estimated": saved.is_estimated if hasattr(saved, 'is_estimated') else True,
+                "data_completeness": saved.data_completeness if hasattr(saved, 'data_completeness') else 0.17,
             })
         else:
             # Generate a demo prediction (for hackathon without trained model)
+            # These are marked as estimated since we don't have real feature data
             demo_risk = round(random.uniform(0.1, 0.7), 2)
             demo_grade = _grade_from_score(random.uniform(45, 95))
             predictions.append({
@@ -126,20 +129,26 @@ async def predict_student_performance(
                 "predicted_grade": demo_grade,
                 "risk_score": demo_risk,
                 "risk_level": _risk_level(demo_risk),
-                "confidence": round(random.uniform(0.75, 0.95), 2),
+                "confidence": round(random.uniform(0.75, 0.95) * 0.17, 2),  # Reduced by data completeness
                 "top_factors": _default_factors(),
+                "is_estimated": True,
+                "data_completeness": 0.17,  # Only attendance + cgpa are real (2/12 features)
             })
 
     return predictions
 
 
 def _default_factors():
-    """Return default SHAP-like explanation factors for demo."""
+    """Return default SHAP-like explanation factors for demo.
+    
+    These are marked with 'estimated' suffix since only attendance
+    and CGPA have real data in the current implementation.
+    """
     return [
-        {"factor": "Attendance Rate", "impact": round(random.uniform(-0.3, 0.3), 2), "value": f"{random.randint(60, 95)}%"},
-        {"factor": "Assignment Submission", "impact": round(random.uniform(-0.2, 0.2), 2), "value": f"{random.randint(50, 100)}%"},
-        {"factor": "Quiz Average", "impact": round(random.uniform(-0.15, 0.15), 2), "value": f"{random.randint(40, 90)}%"},
-        {"factor": "Lab Participation", "impact": round(random.uniform(-0.1, 0.1), 2), "value": f"{random.randint(30, 100)}%"},
+        {"factor": "Attendance Rate", "impact": round(random.uniform(-0.3, 0.3), 2), "value": f"{random.randint(60, 95)}%", "is_real": True},
+        {"factor": "Cumulative GPA", "impact": round(random.uniform(-0.2, 0.2), 2), "value": f"{random.uniform(5.0, 9.5):.1f}", "is_real": True},
+        {"factor": "Assignment Submission (est.)", "impact": round(random.uniform(-0.15, 0.15), 2), "value": "~70%", "is_real": False},
+        {"factor": "Quiz Average (est.)", "impact": round(random.uniform(-0.1, 0.1), 2), "value": "~60%", "is_real": False},
     ]
 
 

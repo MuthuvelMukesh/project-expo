@@ -102,14 +102,28 @@ export default function ChatWidget() {
 
         try {
             const res = await api.chatQuery(userMsg);
-            setMessages(prev => [
-                ...prev,
-                {
-                    role: 'bot',
-                    text: res.response,
-                    actions: res.suggested_actions,
-                },
-            ]);
+            
+            // Check if this is a redirect response
+            if (res.redirect_to_console) {
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        role: 'bot',
+                        text: res.response,
+                        isRedirect: true,
+                        suggestedCommand: res.suggested_command,
+                    },
+                ]);
+            } else {
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        role: 'bot',
+                        text: res.response,
+                        actions: res.suggested_actions,
+                    },
+                ]);
+            }
         } catch (err) {
             setMessages(prev => [
                 ...prev,
@@ -121,6 +135,13 @@ export default function ChatWidget() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleOpenConsole = (suggestedCommand) => {
+        setOpen(false);
+        navigate('/copilot', { 
+            state: { prefill: suggestedCommand } 
+        });
     };
 
     const handleKeyDown = (e) => {
@@ -168,6 +189,55 @@ export default function ChatWidget() {
                         {messages.map((msg, i) => (
                             <div key={i} className={`chat-message ${msg.role}`}>
                                 <span dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.text) }} />
+                                
+                                {/* Redirect card for write operations */}
+                                {msg.isRedirect && (
+                                    <div style={{
+                                        background: 'rgba(245, 158, 11, 0.15)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        borderRadius: 8,
+                                        padding: 12,
+                                        marginTop: 8,
+                                    }}>
+                                        <div style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            marginBottom: 8,
+                                            color: '#F59E0B',
+                                            fontWeight: 500,
+                                            fontSize: '0.8rem',
+                                        }}>
+                                            ⚠️ Write Operation Detected
+                                        </div>
+                                        <p style={{
+                                            fontSize: '0.75rem',
+                                            color: '#9CA3AF',
+                                            marginBottom: 10,
+                                        }}>
+                                            I can only read data. Use the Command Console to make changes.
+                                        </p>
+                                        <button
+                                            onClick={() => handleOpenConsole(msg.suggestedCommand)}
+                                            style={{
+                                                background: 'rgba(245, 158, 11, 0.25)',
+                                                border: '1px solid rgba(245, 158, 11, 0.5)',
+                                                borderRadius: 6,
+                                                color: '#F59E0B',
+                                                padding: '6px 12px',
+                                                fontSize: '0.75rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 6,
+                                            }}
+                                        >
+                                            <Terminal size={12} />
+                                            Open Command Console →
+                                        </button>
+                                    </div>
+                                )}
+                                
                                 {msg.actions && msg.actions.length > 0 && (
                                     <div style={{ marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                                         {msg.actions.map((action, j) => {

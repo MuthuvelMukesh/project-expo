@@ -287,26 +287,46 @@ async def _estimate_impact(db: AsyncSession, entity: str, filters: dict) -> int:
     return int(result.scalar() or 0)
 
 
-def _classify_risk(intent: str, entity: str, impact_count: int, fields: list[str]) -> str:
+def _classify_risk(intent: str, entity: str, impact_count: int, fields: list[str] = None) -> str:
+    """
+    Classify operation risk level.
+    
+    HIGH:   DELETE intent (always)
+            User/permission entity with write intent (always)
+            Impact count above RISK_HIGH_IMPACT_COUNT threshold
+    MEDIUM: UPDATE or CREATE intent within safe count range
+            Impact count above RISK_MEDIUM_IMPACT_COUNT threshold
+    LOW:    READ or ANALYZE intent (always)
+    """
+    # Rule 1: READ and ANALYZE are always LOW regardless of count
     if intent in {"READ", "ANALYZE"}:
         return "LOW"
 
-    high_fields = {"salary", "base_salary", "net_salary", "gross_salary", "tax_rate"}
-    if intent == "DELETE" and impact_count >= 1:
-        return "HIGH" if impact_count > 1 else "MEDIUM"
-    if any(field in high_fields for field in fields):
+    # Rule 2: DELETE is always HIGH regardless of count
+    if intent == "DELETE":
         return "HIGH"
-    if impact_count > 25:
+
+    # Rule 3: Modifying users or permissions is always HIGH
+    if entity == "user" and intent in {"UPDATE", "CREATE"}:
         return "HIGH"
+
+    # Rule 4: Large bulk operations are HIGH
+    if impact_count > settings.RISK_HIGH_IMPACT_COUNT:
+        return "HIGH"
+
+    # Rule 5: Write operations are at least MEDIUM
     if intent in {"UPDATE", "CREATE"}:
         return "MEDIUM"
+
+    # Rule 6: Everything else is LOW
     return "LOW"
 
 
 async def _audit(
     db: AsyncSession,
     *,
-    user: User,
+    user_id: int,
+    role: str,
     module: str,
     operation_type: str,
     event_type: str,
@@ -322,8 +342,8 @@ async def _audit(
         event_id=f"audit_{uuid.uuid4().hex[:16]}",
         plan_id=plan_id,
         execution_id=execution_id,
-        user_id=user.id,
-        role=user.role.value,
+        user_id=user_id,
+        role=role,
         module=module,
         operation_type=operation_type,
         event_type=event_type,
@@ -521,7 +541,8 @@ async def create_operational_plan(
 
     await _audit(
         db,
-        user=user,
+        user_id=user.id,
+        role=user.role.value,
         module=module,
         operation_type=intent,
         event_type="clarification_required" if needs_clarification else "intent_extracted",
@@ -610,7 +631,8 @@ async def add_approval_decision(
 
     await _audit(
         db,
-        user=user,
+        user_id=user.id,
+        role=user.role.value,
         module=plan.module,
         operation_type=plan.intent_type,
         event_type=normalized_decision.lower(),
@@ -673,10 +695,15 @@ async def execute_operational_plan(*, db: AsyncSession, user: User, plan_id: str
 
     model = ENTITY_REGISTRY[plan.entity]["model"]
     execution_id = f"exec_{uuid.uuid4().hex[:12]}"
+    
+    # Capture user info before any operations to avoid greenlet issues after rollback
+    user_id = user.id
+    user_role = user.role.value
+    
     execution = OperationalExecution(
         execution_id=execution_id,
         plan_id=plan.plan_id,
-        executed_by=user.id,
+        executed_by=user_id,
         status="pending",
     )
     db.add(execution)
@@ -699,7 +726,8 @@ async def execute_operational_plan(*, db: AsyncSession, user: User, plan_id: str
 
             await _audit(
                 db,
-                user=user,
+                user_id=user_id,
+                role=user_role,
                 module=plan.module,
                 operation_type=plan.intent_type,
                 event_type="executed",
@@ -748,7 +776,8 @@ async def execute_operational_plan(*, db: AsyncSession, user: User, plan_id: str
 
         await _audit(
             db,
-            user=user,
+            user_id=user_id,
+            role=user_role,
             module=plan.module,
             operation_type=plan.intent_type,
             event_type="executed",
@@ -786,7 +815,8 @@ async def execute_operational_plan(*, db: AsyncSession, user: User, plan_id: str
 
         await _audit(
             db,
-            user=user,
+            user_id=user_id,
+            role=user_role,
             module=plan.module,
             operation_type=plan.intent_type,
             event_type="failed",
@@ -867,7 +897,8 @@ async def rollback_execution(*, db: AsyncSession, user: User, execution_id: str)
 
         await _audit(
             db,
-            user=user,
+            user_id=user.id,
+            role=user.role.value,
             module=plan.module,
             operation_type=plan.intent_type,
             event_type="rollback",

@@ -1,6 +1,7 @@
 /**
  * CampusIQ — API Service
  * Centralized HTTP client for all backend API calls.
+ * Uses httpOnly cookies for authentication.
  */
 
 import {
@@ -14,41 +15,19 @@ import {
 const API_BASE = '/api';
 
 class ApiService {
-    constructor() {
-        this.token = localStorage.getItem('campusiq_token');
-    }
-
-    setToken(token) {
-        this.token = token;
-        if (token) {
-            localStorage.setItem('campusiq_token', token);
-        } else {
-            localStorage.removeItem('campusiq_token');
-        }
-    }
-
-    getToken() {
-        return this.token || localStorage.getItem('campusiq_token');
-    }
-
     async request(endpoint, options = {}) {
         const headers = {
             'Content-Type': 'application/json',
             ...options.headers,
         };
 
-        const token = this.getToken();
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-
         const response = await fetch(`${API_BASE}${endpoint}`, {
             ...options,
             headers,
+            credentials: 'include',  // Send cookies with every request
         });
 
         if (response.status === 401) {
-            this.setToken(null);
             window.location.href = '/login';
             throw new Error('Session expired. Please login again.');
         }
@@ -81,12 +60,14 @@ class ApiService {
 
     // ─── Auth ────────────────────────────────────────────────
     async login(email, password) {
-        const data = await this.request('/auth/login', {
+        return this.request('/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email, password }),
         });
-        this.setToken(data.access_token);
-        return data;
+    }
+
+    async logout() {
+        return this.request('/auth/logout', { method: 'POST' });
     }
 
     async register(email, password, fullName, role) {
@@ -161,29 +142,6 @@ class ApiService {
             method: 'POST',
             body: JSON.stringify({ message, context }),
         });
-    }
-
-    // ─── AI Copilot ─────────────────────────────────────────
-    async copilotPlan(message) {
-        return this.request('/copilot/plan', {
-            method: 'POST',
-            body: JSON.stringify({ message }),
-        });
-    }
-
-    async copilotExecute(planId, approvedIds = [], rejectedIds = []) {
-        return this.request('/copilot/execute', {
-            method: 'POST',
-            body: JSON.stringify({
-                plan_id: planId,
-                approved_action_ids: approvedIds,
-                rejected_action_ids: rejectedIds,
-            }),
-        });
-    }
-
-    async copilotHistory() {
-        return this.request('/copilot/history');
     }
 
     // ─── Operational AI (Conversational Ops) ────────────────
@@ -518,12 +476,6 @@ class ApiService {
     async getEmployeeAttendance(employeeId, month = null, year = null) {
         const q = (month || year) ? `?${month ? `month=${month}` : ''}${year ? `&year=${year}` : ''}` : '';
         return this.request(`/hr/attendance/${employeeId}${q}`);
-    }
-
-    // ─── Utility ─────────────────────────────────────────────
-    logout() {
-        this.setToken(null);
-        window.location.href = '/login';
     }
 }
 

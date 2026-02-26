@@ -1,6 +1,5 @@
 """
-Gemini key-pool client with graceful degradation and retry failover.
-Optimized with connection pooling and improved error handling.
+LLM client with OpenRouter (primary) and Gemini (fallback) support.
 """
 
 import logging
@@ -11,30 +10,7 @@ import httpx
 from app.core.config import get_settings
 
 settings = get_settings()
-log = logging.getLogger("campusiq.gemini_pool")
-
-# Shared HTTP client with connection pooling for better performance
-_http_client: Optional[httpx.AsyncClient] = None
-
-
-def _get_http_client() -> httpx.AsyncClient:
-    """Get or create a shared HTTP client with connection pooling."""
-    global _http_client
-    if _http_client is None or _http_client.is_closed:
-        _http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(30.0, connect=10.0),
-            limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
-            http2=True,  # Enable HTTP/2 for better performance
-        )
-    return _http_client
-
-
-async def close_http_client():
-    """Close the shared HTTP client. Call this on app shutdown."""
-    global _http_client
-    if _http_client is not None:
-        await _http_client.aclose()
-        _http_client = None
+log = logging.getLogger("campusiq.llm_pool")
 
 
 class GeminiPoolError(Exception):
@@ -46,7 +22,12 @@ class GeminiPoolError(Exception):
 
 
 class GeminiPoolClient:
-    """Module-isolated Gemini API key pool with retry across keys."""
+    """LLM client that uses OpenRouter (if configured) or Gemini as fallback."""
+
+    @staticmethod
+    def _use_openrouter() -> bool:
+        """Check if OpenRouter is configured and should be used."""
+        return bool(settings.OPENROUTER_API_KEY)
 
     @staticmethod
     def _module_keys(module: str) -> list[str]:
@@ -58,18 +39,85 @@ class GeminiPoolClient:
         return []
 
     @staticmethod
+    async def _openrouter_request(
+        system_prompt: str,
+        user_message: str,
+        temperature: float = 0.1,
+        timeout: float = 30.0,
+        json_mode: bool = False,
+    ) -> dict:
+        """Make a request to OpenRouter API (OpenAI-compatible format)."""
+        endpoint = f"{settings.OPENROUTER_BASE_URL}/chat/completions"
+        
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_message})
+        
+        payload = {
+            "model": settings.OPENROUTER_MODEL,
+            "messages": messages,
+            "temperature": temperature,
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://campusiq.edu",
+            "X-Title": "CampusIQ",
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(endpoint, json=payload, headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices", [])
+                if choices:
+                    content = choices[0].get("message", {}).get("content", "").strip()
+                    return {"ok": True, "text": content}
+                return {"ok": False, "error": "No response content"}
+            
+            log.warning(f"OpenRouter error: {response.status_code} - {response.text[:200]}")
+            return {"ok": False, "error": f"HTTP {response.status_code}"}
+            
+        except Exception as e:
+            log.error(f"OpenRouter request failed: {e}")
+            return {"ok": False, "error": str(e)}
+
+    @staticmethod
     async def generate_json(module: str, prompt: str, timeout: float = 25.0) -> dict:
+        # Try OpenRouter first if configured
+        if GeminiPoolClient._use_openrouter():
+            system = "You are a helpful AI assistant. Return only valid JSON. No markdown code blocks, no commentary, just raw JSON."
+            result = await GeminiPoolClient._openrouter_request(
+                system_prompt=system,
+                user_message=prompt,
+                temperature=0.1,
+                timeout=timeout,
+                json_mode=True,
+            )
+            if result.get("ok"):
+                return result
+            log.warning(f"OpenRouter failed, trying Gemini fallback: {result.get('error')}")
+        
+        # Fallback to Gemini
         keys = GeminiPoolClient._module_keys(module)
         if not keys:
+            if GeminiPoolClient._use_openrouter():
+                raise GeminiPoolError(
+                    code="LLM_UNAVAILABLE",
+                    message="OpenRouter request failed and no Gemini keys configured.",
+                    retry_eta_seconds=settings.GEMINI_RETRY_ETA_SECONDS,
+                )
             raise GeminiPoolError(
                 code="NO_KEYS_CONFIGURED",
-                message=f"No Gemini keys configured for module '{module}'.",
+                message=f"No LLM keys configured for module '{module}'.",
                 retry_eta_seconds=settings.GEMINI_RETRY_ETA_SECONDS,
             )
 
         last_status: Optional[int] = None
-        client = _get_http_client()
-        
         for key in keys:
             endpoint = (
                 f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
@@ -82,11 +130,12 @@ class GeminiPoolClient:
                     ]
                 },
                 "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.1, "topP": 0.95, "topK": 40},
+                "generationConfig": {"temperature": 0.1},
             }
 
             try:
-                response = await client.post(endpoint, json=payload, timeout=timeout)
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(endpoint, json=payload)
 
                 if response.status_code == 200:
                     data = response.json()
@@ -103,8 +152,7 @@ class GeminiPoolClient:
 
             except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError):
                 continue
-            except Exception as e:
-                log.debug(f"Unexpected error with key in module '{module}': {e}")
+            except Exception:
                 continue
 
         retry_eta = settings.GEMINI_RETRY_ETA_SECONDS
@@ -127,21 +175,39 @@ class GeminiPoolClient:
         timeout: float = 30.0,
     ) -> str:
         """
-        Generate a conversational (prose) response via Gemini.
+        Generate a conversational (prose) response.
+        Uses OpenRouter if configured, otherwise falls back to Gemini.
         Returns the response text string.
-        Raises GeminiPoolError if all keys are exhausted.
+        Raises GeminiPoolError if all backends are exhausted.
         """
+        # Try OpenRouter first if configured
+        if GeminiPoolClient._use_openrouter():
+            result = await GeminiPoolClient._openrouter_request(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                temperature=temperature,
+                timeout=timeout,
+            )
+            if result.get("ok"):
+                return result["text"]
+            log.warning(f"OpenRouter failed for text gen, trying Gemini: {result.get('error')}")
+        
+        # Fallback to Gemini
         keys = GeminiPoolClient._module_keys(module)
         if not keys:
+            if GeminiPoolClient._use_openrouter():
+                raise GeminiPoolError(
+                    code="LLM_UNAVAILABLE",
+                    message="OpenRouter request failed and no Gemini keys configured.",
+                    retry_eta_seconds=settings.GEMINI_RETRY_ETA_SECONDS,
+                )
             raise GeminiPoolError(
                 code="NO_KEYS_CONFIGURED",
-                message=f"No Gemini keys configured for module '{module}'.",
+                message=f"No LLM keys configured for module '{module}'.",
                 retry_eta_seconds=settings.GEMINI_RETRY_ETA_SECONDS,
             )
 
         last_status: Optional[int] = None
-        client = _get_http_client()
-        
         for key in keys:
             endpoint = (
                 f"{settings.GOOGLE_BASE_URL}/models/{settings.GOOGLE_MODEL}:generateContent"
@@ -150,16 +216,12 @@ class GeminiPoolClient:
             payload = {
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
                 "contents": [{"role": "user", "parts": [{"text": user_message}]}],
-                "generationConfig": {
-                    "temperature": temperature, 
-                    "topP": 0.95, 
-                    "topK": 40,
-                    "maxOutputTokens": 1024,
-                },
+                "generationConfig": {"temperature": temperature},
             }
 
             try:
-                response = await client.post(endpoint, json=payload, timeout=timeout)
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(endpoint, json=payload)
 
                 if response.status_code == 200:
                     data = response.json()
@@ -178,8 +240,7 @@ class GeminiPoolClient:
 
             except (httpx.ConnectError, httpx.ReadTimeout, httpx.RemoteProtocolError):
                 continue
-            except Exception as e:
-                log.debug(f"Unexpected error with key in module '{module}': {e}")
+            except Exception:
                 continue
 
         retry_eta = settings.GEMINI_RETRY_ETA_SECONDS

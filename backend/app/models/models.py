@@ -114,6 +114,17 @@ class Attendance(Base):
     course = relationship("Course", back_populates="attendances")
 
 
+# =============================================================
+# ML FEATURE TABLES — Planned for v2
+# The following tables are needed for full ML feature coverage:
+# - AssignmentSubmission: assignment_id, student_id, submitted_at, score
+# - QuizScore: quiz_id, student_id, course_id, marks_obtained, max_marks
+# - LabRecord: student_id, course_id, participation_score, max_score
+# - ClassParticipationLog: student_id, course_id, date, score
+# Currently, predictions use training means for these features.
+# =============================================================
+
+
 class Prediction(Base):
     __tablename__ = "predictions"
 
@@ -124,6 +135,8 @@ class Prediction(Base):
     risk_score = Column(Float)  # 0.0 to 1.0
     confidence = Column(Float)
     factors = Column(JSON)  # SHAP explanation as JSON
+    is_estimated = Column(Boolean, default=False)  # True if using training means for missing data
+    data_completeness = Column(Float, default=1.0)  # Fraction of features with real data (0.0-1.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

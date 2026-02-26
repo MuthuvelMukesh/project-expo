@@ -27,7 +27,12 @@ class Settings(BaseSettings):
     # Google Gemini — primary key (fallback when module pools are empty)
     GOOGLE_API_KEY: str = ""
     GOOGLE_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
-    GOOGLE_MODEL: str = "gemini-1.5-flash"
+    GOOGLE_MODEL: str = "gemini-2.0-flash"
+
+    # OpenRouter LLM (preferred over Gemini when configured)
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "liquid/lfm-2.5-1.2b-thinking:free"
 
     # Per-module Gemini key pools (comma-separated; each module gets rate-limit isolation)
     GEMINI_NLP_KEYS: str = ""          # academic NLP / copilot planner
@@ -42,6 +47,10 @@ class Settings(BaseSettings):
     OPS_MAX_PREVIEW_ROWS: int = 50
     OPS_SENIOR_ROLES: str = "admin"
     OPS_REQUIRE_2FA_HIGH_RISK: bool = True
+    
+    # Risk Classification Thresholds
+    RISK_HIGH_IMPACT_COUNT: int = 50
+    RISK_MEDIUM_IMPACT_COUNT: int = 10
     
     # ML
     MODEL_PATH: str = "app/ml/models"

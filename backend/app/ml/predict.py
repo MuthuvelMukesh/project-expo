@@ -25,6 +25,24 @@ MODEL_DIR = os.path.join(BASE_DIR, "models")
 MODEL_PATH = os.path.join(MODEL_DIR, "grade_predictor.joblib")
 METADATA_PATH = os.path.join(MODEL_DIR, "model_metadata.json")
 
+# ─── Feature Means from Training Data ───────────────────────
+# Used when real data is unavailable for a feature
+
+FEATURE_MEANS = {
+    "attendance_pct": 75.0,
+    "assignment_submission_rate": 70.0,
+    "assignment_avg_score": 65.0,
+    "quiz_avg": 60.0,
+    "lab_pct": 70.0,
+    "midterm_score": 55.0,
+    "cgpa": 7.0,
+    "study_hours_per_week": 10,
+    "credits": 4,
+    "has_scholarship": 0,
+    "extracurricular_hours": 5,
+    "commute_time_mins": 30,
+}
+
 # ─── Singleton Model Cache ──────────────────────────────────
 
 _model = None
@@ -66,12 +84,15 @@ def get_explainer():
         return None
 
 
-def predict_grade(features: dict) -> dict:
+def predict_grade(feature_data: dict) -> dict:
     """
     Predict grade and risk for a single student-course record.
 
     Args:
-        features: Dict with keys matching FEATURE_COLS
+        feature_data: Either a dict with keys matching FEATURE_COLS,
+                      or a dict with "features" key containing features
+                      plus optional "missing_features", "is_estimated",
+                      "data_completeness" keys.
 
     Returns:
         {
@@ -81,12 +102,36 @@ def predict_grade(features: dict) -> dict:
             "risk_level": str,
             "confidence": float,
             "factors": [...],
+            "is_estimated": bool,
+            "data_completeness": float,
+            "missing_features": [...],
         }
     """
     model = load_model()
 
+    # Handle both old format (direct features) and new format (wrapped)
+    if "features" in feature_data:
+        features = feature_data["features"]
+        missing = feature_data.get("missing_features", [])
+        is_estimated = feature_data.get("is_estimated", False)
+        data_completeness = feature_data.get("data_completeness", 1.0)
+    else:
+        features = feature_data
+        missing = []
+        is_estimated = False
+        data_completeness = 1.0
+
+    # Replace None values with training means
+    resolved_features = {}
+    for col in FEATURE_COLS:
+        val = features.get(col)
+        if val is None:
+            resolved_features[col] = FEATURE_MEANS.get(col, 0)
+        else:
+            resolved_features[col] = val
+
     # Prepare features
-    X = prepare_single_record(features)
+    X = prepare_single_record(resolved_features)
 
     # Predict
     predicted_score = float(model.predict(X)[0])
@@ -108,8 +153,12 @@ def predict_grade(features: dict) -> dict:
     except Exception:
         confidence = 0.85
 
+    # Reduce confidence if using estimated features
+    if is_estimated:
+        confidence = confidence * data_completeness
+
     # SHAP explanations
-    factors = generate_shap_factors(X, features)
+    factors = generate_shap_factors(X, resolved_features)
 
     return {
         "predicted_score": round(predicted_score, 1),
@@ -118,6 +167,9 @@ def predict_grade(features: dict) -> dict:
         "risk_level": risk_level(risk),
         "confidence": round(confidence, 3),
         "factors": factors,
+        "is_estimated": is_estimated,
+        "data_completeness": round(data_completeness, 2),
+        "missing_features": missing,
     }
 
 

@@ -8,15 +8,11 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const token = api.getToken();
-        if (token) {
-            api.getMe()
-                .then(setUser)
-                .catch(() => api.setToken(null))
-                .finally(() => setLoading(false));
-        } else {
-            setLoading(false);
-        }
+        // Check if user is authenticated via httpOnly cookie
+        api.getMe()
+            .then(setUser)
+            .catch(() => setUser(null))
+            .finally(() => setLoading(false));
     }, []);
 
     const login = async (email, password) => {
@@ -26,9 +22,9 @@ export function AuthProvider({ children }) {
         return userData;
     };
 
-    const logout = () => {
+    const logout = async () => {
+        await api.logout();
         setUser(null);
-        api.logout();
     };
 
     return (

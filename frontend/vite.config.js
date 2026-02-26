@@ -11,6 +11,7 @@ export default defineConfig({
       '/api': {
         target: apiProxyTarget,
         changeOrigin: true,
+        cookieDomainRewrite: 'localhost',  // Rewrite cookie domain for local dev
       },
     },
   },

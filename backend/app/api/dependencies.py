@@ -5,7 +5,7 @@ JWT auth dependency and role-based access control.
 
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Cookie, Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -18,12 +18,16 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     token: Optional[str] = Query(default=None),
+    access_token: Optional[str] = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Extract and validate JWT token, return the current user."""
-    resolved_token = credentials.credentials if credentials else token
+    """Extract and validate JWT token from cookie or header, return the current user."""
+    # Priority: 1) httpOnly cookie, 2) Authorization header, 3) query param
+    resolved_token = access_token or (credentials.credentials if credentials else None) or token
+    
     if not resolved_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
