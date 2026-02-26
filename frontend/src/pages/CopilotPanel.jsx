@@ -451,8 +451,8 @@ export default function CopilotPanel() {
                                     disabled={isLoading}
                                     style={{
                                         width: '100%', padding: '14px 16px',
-                                        background: 'rgba(15,23,42,0.6)',
-                                        border: '1px solid rgba(148,163,184,0.2)',
+                                        background: 'rgba(148,163,184,0.15)',
+                                        border: '1px solid rgba(148,163,184,0.3)',
                                         borderRadius: 12, color: 'var(--text-primary)',
                                         fontSize: '0.95rem', resize: 'none', fontFamily: 'inherit',
                                         outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box',
@@ -588,25 +588,25 @@ export default function CopilotPanel() {
                                         <strong style={{ color: 'var(--text-primary)' }}>Command:</strong> {plan.status === 'clarification_required' ? input : input}
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(15,23,42,0.5)' }}>
+                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(148,163,184,0.12)' }}>
                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 4 }}>ENTITY</div>
                                             <div style={{ fontWeight: 700, textTransform: 'capitalize', fontSize: '0.9rem' }}>
                                                 <Database size={13} style={{ verticalAlign: 'middle', marginRight: 5, opacity: 0.7 }} />
                                                 {plan.entity}
                                             </div>
                                         </div>
-                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(15,23,42,0.5)' }}>
+                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(148,163,184,0.12)' }}>
                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 4 }}>AFFECTED RECORDS</div>
                                             <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
                                                 <Activity size={13} style={{ verticalAlign: 'middle', marginRight: 5, opacity: 0.7 }} />
                                                 {plan.estimated_impact_count}
                                             </div>
                                         </div>
-                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(15,23,42,0.5)' }}>
+                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(148,163,184,0.12)' }}>
                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 6 }}>AI CONFIDENCE</div>
                                             <ConfidenceMeter value={plan.confidence} />
                                         </div>
-                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(15,23,42,0.5)' }}>
+                                        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(148,163,184,0.12)' }}>
                                             <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 4 }}>STATUS</div>
                                             <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#A78BFA' }}>
                                                 {plan.status?.replace(/_/g, ' ').toUpperCase()}
@@ -696,7 +696,7 @@ export default function CopilotPanel() {
                                         placeholder="Provide clarification..."
                                         style={{
                                             flex: 1, padding: '10px 14px',
-                                            background: 'rgba(15,23,42,0.6)',
+                                            background: 'rgba(148,163,184,0.15)',
                                             border: '1px solid rgba(255,179,0,0.3)',
                                             borderRadius: 10, color: 'var(--text-primary)',
                                             fontSize: '0.88rem', outline: 'none',
@@ -820,8 +820,8 @@ export default function CopilotPanel() {
                                             placeholder="Reason for this operation..."
                                             style={{
                                                 width: '100%', padding: '9px 13px',
-                                                background: 'rgba(15,23,42,0.5)',
-                                                border: '1px solid rgba(148,163,184,0.2)',
+                                                background: 'rgba(148,163,184,0.15)',
+                                                border: '1px solid rgba(148,163,184,0.3)',
                                                 borderRadius: 10, color: 'var(--text-primary)',
                                                 fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box',
                                             }}
@@ -981,7 +981,7 @@ export default function CopilotPanel() {
                                 { label: 'Records Affected', value: execution.affected_count ?? 0, color: '#64B5F6' },
                                 { label: 'Status', value: execution.status?.toUpperCase(), color: execution.status === 'executed' ? '#00E676' : execution.status === 'rolled_back' ? '#FFB300' : '#FF5252' },
                             ].map(s => (
-                                <div key={s.label} style={{ padding: '10px 16px', borderRadius: 10, background: 'rgba(15,23,42,0.5)' }}>
+                                <div key={s.label} style={{ padding: '10px 16px', borderRadius: 10, background: 'rgba(148,163,184,0.12)' }}>
                                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: 4 }}>{s.label}</div>
                                     <div style={{ fontWeight: 700, color: s.color }}>{s.value}</div>
                                 </div>
@@ -1022,11 +1022,11 @@ export default function CopilotPanel() {
                                                 marginBottom: 8, borderRadius: 8, overflow: 'hidden',
                                                 border: '1px solid rgba(148,163,184,0.1)',
                                             }}>
-                                                <div style={{ padding: '6px 12px', background: 'rgba(15,23,42,0.5)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                                <div style={{ padding: '6px 12px', background: 'rgba(148,163,184,0.12)', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                                                     Record #{before.id || (idx + 1)}
                                                 </div>
                                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                                    <thead><tr style={{ background: 'rgba(15,23,42,0.3)' }}>
+                                                    <thead><tr style={{ background: 'rgba(148,163,184,0.08)' }}>
                                                         {['Field', 'Before', 'After'].map(h => (
                                                             <th key={h} style={{ padding: '5px 10px', textAlign: 'left', fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>{h}</th>
                                                         ))}
@@ -1114,8 +1114,8 @@ export default function CopilotPanel() {
                                         onChange={e => setHistoryFilter(prev => ({ ...prev, [f.key]: e.target.value }))}
                                         style={{
                                             padding: '6px 12px', borderRadius: 8, fontSize: '0.8rem',
-                                            background: 'rgba(15,23,42,0.5)',
-                                            border: '1px solid rgba(148,163,184,0.15)',
+                                            background: 'rgba(148,163,184,0.15)',
+                                            border: '1px solid rgba(148,163,184,0.25)',
                                             color: 'var(--text-primary)', outline: 'none',
                                         }}
                                     >

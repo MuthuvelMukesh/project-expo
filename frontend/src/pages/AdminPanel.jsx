@@ -125,7 +125,16 @@ export default function AdminPanel() {
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
                                 <XAxis dataKey="name" tick={{ fill: '#94A3B8', fontSize: 12 }} />
                                 <YAxis tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                                <Tooltip contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8, color: '#F1F5F9' }} />
+                                <Tooltip 
+                                    contentStyle={{ 
+                                        backgroundColor: 'var(--bg-elevated)', 
+                                        border: '1px solid var(--border-color)', 
+                                        borderRadius: 8, 
+                                        color: 'var(--text-primary)',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                    }}
+                                    labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                                />
                                 <Legend wrapperStyle={{ color: '#94A3B8', fontSize: 12 }} />
                                 <Bar dataKey="attendance" name="Avg Attendance %" fill="#6C63FF" radius={[4, 4, 0, 0]} />
                                 <Bar dataKey="risk" name="High Risk %" fill="#FF5252" radius={[4, 4, 0, 0]} />
@@ -154,7 +163,16 @@ export default function AdminPanel() {
                                         <Cell key={i} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <Tooltip contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8, color: '#F1F5F9' }} />
+                                <Tooltip 
+                                    contentStyle={{ 
+                                        backgroundColor: 'var(--bg-elevated)', 
+                                        border: '1px solid var(--border-color)', 
+                                        borderRadius: 8, 
+                                        color: 'var(--text-primary)',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                    }}
+                                    labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                                />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>

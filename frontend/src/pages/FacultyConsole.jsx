@@ -182,7 +182,16 @@ export default function FacultyConsole() {
                                                 <Cell key={i} fill={entry.color} />
                                             ))}
                                         </Pie>
-                                        <Tooltip contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8, color: '#F1F5F9' }} />
+                                        <Tooltip 
+                                            contentStyle={{ 
+                                                backgroundColor: 'var(--bg-elevated)', 
+                                                border: '1px solid var(--border-color)', 
+                                                borderRadius: 8, 
+                                                color: 'var(--text-primary)',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                            }}
+                                            labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -200,7 +209,16 @@ export default function FacultyConsole() {
                                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
                                         <XAxis dataKey="name" tick={{ fill: '#94A3B8', fontSize: 10 }} angle={-30} textAnchor="end" height={50} />
                                         <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8', fontSize: 12 }} />
-                                        <Tooltip contentStyle={{ background: '#1E293B', border: 'none', borderRadius: 8, color: '#F1F5F9' }} />
+                                        <Tooltip 
+                                            contentStyle={{ 
+                                                backgroundColor: 'var(--bg-elevated)', 
+                                                border: '1px solid var(--border-color)', 
+                                                borderRadius: 8, 
+                                                color: 'var(--text-primary)',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                            }}
+                                            labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
+                                        />
                                         <Bar dataKey="risk" radius={[6, 6, 0, 0]}>
                                             {riskRoster.students?.slice(0, 10)?.map((s, i) => (
                                                 <Cell key={i} fill={RISK_COLORS[s.risk_level]} />

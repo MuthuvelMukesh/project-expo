@@ -145,7 +145,14 @@ export default function StudentDashboard() {
                                 <XAxis dataKey="name" tick={{ fill: '#94A3B8', fontSize: 12 }} />
                                 <YAxis domain={[0, 100]} tick={{ fill: '#94A3B8', fontSize: 12 }} />
                                 <Tooltip
-                                    contentStyle={{ background: '#1E293B', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 8, color: '#F1F5F9' }}
+                                    contentStyle={{ 
+                                        backgroundColor: 'var(--bg-elevated)', 
+                                        border: '1px solid var(--border-color)', 
+                                        borderRadius: 8, 
+                                        color: 'var(--text-primary)',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                    }}
+                                    labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
                                 />
                                 <Bar dataKey="attendance" radius={[6, 6, 0, 0]}>
                                     {attendanceChartData.map((entry, i) => (
@@ -179,7 +186,14 @@ export default function StudentDashboard() {
                                         ))}
                                     </Pie>
                                     <Tooltip
-                                        contentStyle={{ background: '#1E293B', border: '1px solid rgba(148,163,184,0.2)', borderRadius: 8, color: '#F1F5F9' }}
+                                        contentStyle={{ 
+                                            backgroundColor: 'var(--bg-elevated)', 
+                                            border: '1px solid var(--border-color)', 
+                                            borderRadius: 8, 
+                                            color: 'var(--text-primary)',
+                                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                                        }}
+                                        labelStyle={{ color: 'var(--text-primary)', fontWeight: 600 }}
                                     />
                                 </PieChart>
                             </ResponsiveContainer>
