@@ -45,7 +45,7 @@ const PaymentForm = ({ invoiceId, amount, onSuccess }) => {
       const response = await api.post('/api/finance/payments', formData);
       
       setSuccess(true);
-      if (onSuccess) onSuccess(response.data);
+      if (onSuccess) onSuccess(response);
       
       setTimeout(() => {
         setSuccess(false);
@@ -57,7 +57,7 @@ const PaymentForm = ({ invoiceId, amount, onSuccess }) => {
         });
       }, 2000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to record payment');
+      setError(err.message || 'Failed to record payment');
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ const PaymentForm = ({ invoiceId, amount, onSuccess }) => {
             name="reference_number" 
             value={formData.reference_number}
             onChange={handleChange}
-            placeholder="Bank trasn ID, card txn, UTR, etc."
+            placeholder="Bank Transaction ID, card txn, UTR, etc."
             required
           />
         </div>

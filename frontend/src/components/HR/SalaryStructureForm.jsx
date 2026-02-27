@@ -61,7 +61,7 @@ const SalaryStructureForm = ({ employeeId, onSuccess }) => {
       
       setTimeout(() => setSuccess(false), 2000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create salary structure');
+      setError(err.message || 'Failed to create salary structure');
     } finally {
       setLoading(false);
     }

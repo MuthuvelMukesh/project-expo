@@ -108,12 +108,14 @@ async def create_test_user(db_session):
     async def _create_user(
         email: str = "test@campusiq.edu",
         password: str = "testpassword123",
+        full_name: str = "Test User",
         role: UserRole = UserRole.STUDENT,
         is_active: bool = True,
     ) -> User:
         user = User(
             email=email,
             hashed_password=pwd_context.hash(password),
+            full_name=full_name,
             role=role,
             is_active=is_active,
         )
@@ -129,6 +131,7 @@ async def create_test_user(db_session):
 async def create_test_student(db_session, create_test_user):
     """Factory to create test students."""
     from app.models.models import Student, Department, UserRole
+    from sqlalchemy import select
 
     async def _create_student(
         email: str = "student1@campusiq.edu",
@@ -138,18 +141,18 @@ async def create_test_student(db_session, create_test_user):
         cgpa: float = 8.5,
     ) -> Student:
         # Create department if needed
-        dept_query = "SELECT * FROM departments WHERE code = 'CSE' LIMIT 1"
-        dept = await db_session.execute(dept_query)
+        result = await db_session.execute(
+            select(Department).where(Department.code == "CSE")
+        )
+        dept = result.scalar_one_or_none()
         if not dept:
-            from app.models.models import Department
-
             dept = Department(
                 name="Computer Science and Engineering",
                 code="CSE",
-                head_faculty_id=None,
             )
             db_session.add(dept)
             await db_session.commit()
+            await db_session.refresh(dept)
 
         # Create user
         user = await create_test_user(email=email, role=UserRole.STUDENT)
@@ -175,6 +178,7 @@ async def create_test_student(db_session, create_test_user):
 async def create_test_faculty(db_session, create_test_user):
     """Factory to create test faculty."""
     from app.models.models import Faculty, Department, UserRole
+    from sqlalchemy import select
 
     async def _create_faculty(
         email: str = "faculty1@campusiq.edu",
@@ -182,18 +186,18 @@ async def create_test_faculty(db_session, create_test_user):
         designation: str = "Assistant Professor",
     ) -> Faculty:
         # Create department if needed
-        dept_query = "SELECT * FROM departments WHERE code = 'CSE' LIMIT 1"
-        dept = await db_session.execute(dept_query)
+        result = await db_session.execute(
+            select(Department).where(Department.code == "CSE")
+        )
+        dept = result.scalar_one_or_none()
         if not dept:
-            from app.models.models import Department
-
             dept = Department(
                 name="Computer Science and Engineering",
                 code="CSE",
-                head_faculty_id=None,
             )
             db_session.add(dept)
             await db_session.commit()
+            await db_session.refresh(dept)
 
         # Create user
         user = await create_test_user(email=email, role=UserRole.FACULTY)

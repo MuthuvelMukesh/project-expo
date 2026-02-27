@@ -5,7 +5,7 @@ CRUD for courses with department and instructor assignment.
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.core.database import get_db
 from app.api.dependencies import require_role, get_current_user

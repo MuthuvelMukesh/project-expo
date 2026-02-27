@@ -21,7 +21,7 @@ function formatMarkdown(text) {
         if (line.startsWith('|') || (line.includes(' | ') && !line.startsWith('*') && !line.startsWith('•'))) {
             if (!inTable) {
                 inTable = true;
-                tableHtml = '<div style="overflow-x:auto;margin:8px 0"><table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
+                tableHtml = '<div style="overflow-x:auto;margin:8px 0;border-radius:8px;overflow:hidden"><table style="width:100%;border-collapse:collapse;font-size:0.75rem;background:var(--bg-elevated,#1e1e2e)">';
                 isHeaderDone = false;
             }
 
@@ -34,10 +34,10 @@ function formatMarkdown(text) {
             const cells = line.split('|').map(c => c.trim()).filter(c => c.length > 0);
             const tag = !isHeaderDone ? 'th' : 'td';
             const bgStyle = !isHeaderDone
-                ? 'background:rgba(108,99,255,0.15);font-weight:600;'
-                : '';
+                ? 'background:rgba(108,99,255,0.35);font-weight:600;color:#fff;'
+                : 'background:var(--bg-elevated,#1e1e2e);color:var(--text-primary,#e0e0e0);';
             tableHtml += '<tr>' + cells.map(c =>
-                `<${tag} style="padding:4px 8px;border:1px solid rgba(255,255,255,0.1);${bgStyle}">${c}</${tag}>`
+                `<${tag} style="padding:6px 10px;border:1px solid var(--border-color,rgba(255,255,255,0.15));${bgStyle}">${c}</${tag}>`
             ).join('') + '</tr>';
 
             if (!isHeaderDone) isHeaderDone = true;
@@ -139,9 +139,7 @@ export default function ChatWidget() {
 
     const handleOpenConsole = (suggestedCommand) => {
         setOpen(false);
-        navigate('/copilot', { 
-            state: { prefill: suggestedCommand } 
-        });
+        navigate(`/copilot?q=${encodeURIComponent(suggestedCommand)}`);
     };
 
     const handleKeyDown = (e) => {

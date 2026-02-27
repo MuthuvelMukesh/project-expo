@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import date, datetime
-from typing import List
+from typing import List, Optional
 
 from app.api.dependencies import get_current_user, require_role
 from app.models.models import UserRole
@@ -27,7 +27,7 @@ class FeeStructureSchema(BaseModel):
     fee_type: str
     amount: float
     valid_from: date
-    valid_to: date = None
+    valid_to: Optional[date] = None
 
     class Config:
         from_attributes = True
@@ -54,7 +54,7 @@ class InvoiceSchema(BaseModel):
     issued_date: date
     due_date: date
     status: str
-    description: str = None
+    description: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -66,9 +66,9 @@ class PaymentSchema(BaseModel):
     amount: float
     payment_date: date
     payment_method: str
-    reference_number: str = None
+    reference_number: Optional[str] = None
     status: str
-    notes: str = None
+    notes: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -78,8 +78,8 @@ class PaymentCreateSchema(BaseModel):
     invoice_id: int
     amount: float
     payment_method: str
-    reference_number: str = None
-    notes: str = None
+    reference_number: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class StudentBalanceSchema(BaseModel):
@@ -88,7 +88,7 @@ class StudentBalanceSchema(BaseModel):
     total_paid: float
     total_outstanding: float
     pending_invoices: int
-    last_payment_date: date = None
+    last_payment_date: Optional[date] = None
 
 
 # ─── Fee Structure Management ────────────────────────────────────
@@ -103,9 +103,9 @@ async def create_fee_structure(
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
 
-    db_fee = FeeStructure(**fee_structure.dict())
+    db_fee = FeeStructure(**fee_structure.model_dump())
     db.add(db_fee)
-    await db.commit()
+    await db.flush()
     await db.refresh(db_fee)
     return db_fee
 
@@ -182,7 +182,7 @@ async def generate_invoice(
         due_date=date.today(),
     )
     db.add(invoice)
-    await db.commit()
+    await db.flush()
     await db.refresh(invoice)
     return invoice
 
@@ -246,7 +246,7 @@ async def record_payment(
     )
     db.add(ledger)
 
-    await db.commit()
+    await db.flush()
     await db.refresh(db_payment)
     return db_payment
 
@@ -341,7 +341,7 @@ async def get_outstanding_dues(
         func.sum(Invoice.amount_due).label("total_due"),
     ).join(Invoice).where(
         Invoice.status.in_(["issued", "overdue"])
-    ).group_by(Student.id)
+    ).group_by(Student.id, Student.roll_number)
 
     result = await db.execute(query)
     dues = result.all()

@@ -14,6 +14,7 @@ import AttendanceDetails from './pages/AttendanceDetails';
 import TimetablePage from './pages/Timetable';
 import FinanceManagement from './pages/FinanceManagement';
 import HRManagement from './pages/HRManagement';
+import StaffSelfService from './pages/StaffSelfService';
 
 function ProtectedRoute({ children, allowedRoles }) {
     const { user, loading } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
                     <Route path="/manage-courses" element={<ProtectedRoute allowedRoles={['admin']}><CourseManagement /></ProtectedRoute>} />
                     <Route path="/manage-departments" element={<ProtectedRoute allowedRoles={['admin']}><DepartmentManagement /></ProtectedRoute>} />
                     <Route path="/hr" element={<ProtectedRoute allowedRoles={['admin']}><HRManagement /></ProtectedRoute>} />
+                    <Route path="/my-portal" element={<ProtectedRoute allowedRoles={['faculty', 'admin']}><StaffSelfService /></ProtectedRoute>} />
                     <Route path="/copilot" element={<ProtectedRoute allowedRoles={['student', 'faculty', 'admin']}><CopilotPanel /></ProtectedRoute>} />
                     <Route path="/governance" element={<ProtectedRoute allowedRoles={['admin']}><GovernanceDashboard /></ProtectedRoute>} />
                     <Route path="*" element={<Navigate to="/" replace />} />

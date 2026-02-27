@@ -9,7 +9,7 @@ from sqlalchemy import select, delete
 
 from app.core.database import get_db
 from app.api.dependencies import get_current_user, require_role
-from app.models.models import Timetable, Course, Faculty, Student, User
+from app.models.models import Timetable, Course, Faculty, Student, User, UserRole
 from app.schemas.schemas import TimetableSlotCreate, TimetableSlotOut
 
 router = APIRouter()
@@ -124,7 +124,7 @@ async def get_faculty_timetable(
 @router.post("/", response_model=TimetableSlotOut)
 async def create_timetable_slot(
     data: TimetableSlotCreate,
-    user: User = Depends(require_role("admin")),
+    user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     """Admin creates a timetable entry."""
@@ -143,7 +143,7 @@ async def create_timetable_slot(
         class_type=data.class_type,
     )
     db.add(slot)
-    await db.commit()
+    await db.flush()
     await db.refresh(slot)
 
     instructor_name = ""
@@ -161,7 +161,7 @@ async def create_timetable_slot(
 @router.delete("/{slot_id}")
 async def delete_timetable_slot(
     slot_id: int,
-    user: User = Depends(require_role("admin")),
+    user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     """Admin deletes a timetable entry."""
@@ -170,5 +170,5 @@ async def delete_timetable_slot(
     if not slot:
         raise HTTPException(status_code=404, detail="Schedule entry not found")
     await db.delete(slot)
-    await db.commit()
+    await db.flush()
     return {"detail": "Schedule entry deleted"}

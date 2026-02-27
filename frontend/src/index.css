@@ -1507,6 +1507,7 @@ tbody tr:last-child td {
   right: 0;
   width: 380px;
   height: 600px;
+  max-height: calc(100vh - 120px);
   background: var(--bg-elevated);
   border-radius: var(--border-radius-xl);
   box-shadow: var(--shadow-xl);
@@ -1586,6 +1587,26 @@ tbody tr:last-child td {
   word-wrap: break-word;
   font-size: 0.875rem;
   line-height: 1.5;
+}
+
+.chat-message.bot .message-bubble table {
+  background: var(--bg-elevated, #1e1e2e) !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chat-message.bot .message-bubble th {
+  background: rgba(108, 99, 255, 0.35) !important;
+  color: #fff !important;
+}
+
+.chat-message.bot .message-bubble td {
+  background: var(--bg-elevated, #1e1e2e) !important;
+  color: var(--text-primary) !important;
+}
+
+.chat-message.bot .message-bubble tr:nth-child(even) td {
+  background: var(--bg-secondary) !important;
 }
 
 .chat-message strong {

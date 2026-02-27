@@ -440,3 +440,430 @@ table tbody tr:hover {
     margin-top: 5px;
   }
 }
+
+/* ─── New Feature Styles ────────────────────────────────────── */
+
+/* Section Tabs (pill-style sub-tabs within a tab) */
+.section-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tab-pill {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 20px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-pill:hover {
+  background: var(--bg-secondary, #f0f0f0);
+}
+
+.tab-pill.active {
+  background: var(--primary-color, #007bff);
+  color: white;
+  border-color: var(--primary-color, #007bff);
+}
+
+.tab-pill .badge {
+  background: #dc3545;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Section Header (title + action button) */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h3 {
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.section-desc {
+  color: var(--text-secondary, #666);
+  margin-bottom: 15px;
+}
+
+/* Inline Form */
+.inline-form {
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  background: var(--bg-section, #f9f9f9);
+}
+
+.inline-form h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+}
+
+/* Filter select */
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+}
+
+/* Leave Types Grid */
+.leave-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.leave-type-card {
+  padding: 15px;
+  border-left-width: 4px;
+}
+
+.lt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.lt-code {
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--primary-color, #007bff);
+}
+
+.lt-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.lt-badge.carry {
+  background: #d4edda;
+  color: #155724;
+}
+
+.lt-days {
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+  margin: 4px 0;
+}
+
+.lt-desc {
+  font-size: 12px;
+  color: var(--text-secondary, #999);
+}
+
+/* Reason cell */
+.reason-cell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Approve / Reject buttons */
+.action-group {
+  display: flex;
+  gap: 5px;
+}
+
+.btn-approve {
+  background: #28a745 !important;
+}
+
+.btn-approve:hover {
+  background: #218838 !important;
+}
+
+.btn-reject {
+  background: #dc3545 !important;
+}
+
+.btn-reject:hover {
+  background: #c82333 !important;
+}
+
+/* Checkbox group */
+.checkbox-group {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* Attendance Controls */
+.attendance-controls {
+  margin-bottom: 20px;
+}
+
+.control-row {
+  display: flex;
+  gap: 15px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.attendance-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: 20px;
+}
+
+/* Employee Directory */
+.employee-directory {
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.directory-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color, #007bff);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.directory-count {
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+}
+
+.employee-row {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.employee-row.selected {
+  background: rgba(0, 123, 255, 0.05);
+}
+
+.emp-name {
+  font-weight: 600;
+}
+
+.type-badge {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.detail-row td {
+  padding: 0 !important;
+  border: none !important;
+}
+
+.employee-detail-panel {
+  padding: 15px 20px;
+  background: var(--bg-section, #f0f7ff);
+  border-left: 4px solid var(--primary-color, #007bff);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-secondary, #999);
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+}
+
+/* Leave Balance inline display */
+.leave-balance-inline {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #ddd);
+}
+
+.leave-balance-inline h5 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-secondary, #666);
+}
+
+.balance-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.balance-chip {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 15px;
+  font-size: 12px;
+}
+
+.bal-code {
+  font-weight: 700;
+  color: var(--primary-color, #007bff);
+}
+
+.bal-nums {
+  color: var(--text-secondary, #666);
+}
+
+/* Staff Self-Service */
+.staff-self-service {
+  padding: 20px;
+}
+
+.staff-self-service .page-header {
+  margin-bottom: 20px;
+}
+
+.profile-info {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color, #eee);
+}
+
+.info-row span {
+  color: var(--text-secondary, #666);
+}
+
+/* Leave Balance Cards */
+.leave-balance-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.balance-card-item {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #ddd);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.bal-header {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary, #333);
+  margin-bottom: 8px;
+}
+
+.bal-bar {
+  height: 6px;
+  background: var(--bg-secondary, #e9ecef);
+  border-radius: 3px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.bal-fill {
+  height: 100%;
+  background: var(--primary-color, #007bff);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.bal-numbers {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.text-muted {
+  color: var(--text-secondary, #999);
+}
+
+/* Leave section header */
+.leave-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Leave Management */
+.leave-management {
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+/* Attendance Management */
+.attendance-management {
+  background: var(--bg-secondary, #f8f9fa);
+  border-radius: 8px;
+  padding: 20px;
+}

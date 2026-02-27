@@ -1,7 +1,10 @@
 """
 CampusIQ LLM Client
 
-Uses OpenRouter (OpenAI-compatible API) for all AI features.
+Supports two providers (set via LLM_PROVIDER env var):
+  • "openrouter"  — OpenAI-compatible proxy (default)
+  • "gemini"      — Google Gemini native API (via its OpenAI-compat endpoint)
+
 One API key. Simple retry. Clean errors.
 Used by: chatbot, NLP CRUD, conversational ops, predictions.
 """
@@ -28,6 +31,31 @@ def _get_client() -> httpx.AsyncClient:
     return _http_client
 
 
+def _get_api_url() -> str:
+    """Return the chat completions URL based on the configured provider."""
+    if settings.LLM_PROVIDER == "gemini":
+        return f"{settings.GEMINI_BASE_URL}/chat/completions"
+    return f"{settings.OPENROUTER_BASE_URL}/chat/completions"
+
+
+def _get_headers() -> dict:
+    """Return auth headers appropriate for the configured provider."""
+    headers = {
+        "Authorization": f"Bearer {settings.GEMINI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    # OpenRouter needs extra headers for attribution
+    if settings.LLM_PROVIDER != "gemini":
+        headers["HTTP-Referer"] = "https://campusiq.edu"
+        headers["X-Title"] = "CampusIQ"
+    return headers
+
+
+def _provider_label() -> str:
+    """Human label for log messages."""
+    return "Gemini" if settings.LLM_PROVIDER == "gemini" else "OpenRouter"
+
+
 class GeminiError(Exception):
     """Raised when LLM API call fails after all retries."""
     pass
@@ -35,7 +63,8 @@ class GeminiError(Exception):
 
 class GeminiClient:
     """
-    Wraps OpenRouter (OpenAI-compatible) API for CampusIQ.
+    Unified LLM client for CampusIQ.
+    Talks to OpenRouter or Google Gemini (both OpenAI-compatible).
     All methods are async. Uses httpx for non-blocking HTTP calls.
     """
 
@@ -48,10 +77,14 @@ class GeminiClient:
         json_mode: bool = False
     ) -> str:
         """
-        Core OpenRouter API call with exponential backoff retry.
+        Core LLM API call with exponential backoff retry.
+        Works with both OpenRouter and native Gemini.
         """
         last_error = None
         client = _get_client()
+        api_url = _get_api_url()
+        headers = _get_headers()
+        label = _provider_label()
 
         messages = [
             {"role": "system", "content": system_instruction},
@@ -67,35 +100,24 @@ class GeminiClient:
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
 
-        headers = {
-            "Authorization": f"Bearer {settings.GEMINI_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://campusiq.edu",
-            "X-Title": "CampusIQ",
-        }
-
         for attempt in range(settings.GEMINI_MAX_RETRIES):
             try:
-                resp = await client.post(
-                    f"{settings.OPENROUTER_BASE_URL}/chat/completions",
-                    json=payload,
-                    headers=headers,
-                )
+                resp = await client.post(api_url, json=payload, headers=headers)
 
                 if resp.status_code == 429:
                     wait = settings.GEMINI_RETRY_DELAY * (2 ** attempt)
-                    logger.warning(f"Rate limited, retrying in {wait}s (attempt {attempt + 1}/{settings.GEMINI_MAX_RETRIES})")
+                    logger.warning(f"[{label}] Rate limited, retrying in {wait}s (attempt {attempt + 1}/{settings.GEMINI_MAX_RETRIES})")
                     await asyncio.sleep(wait)
                     continue
 
                 if resp.status_code >= 400:
                     error_text = resp.text[:300]
-                    raise GeminiError(f"OpenRouter API error {resp.status_code}: {error_text}")
+                    raise GeminiError(f"{label} API error {resp.status_code}: {error_text}")
 
                 data = resp.json()
 
                 if "error" in data:
-                    raise GeminiError(f"OpenRouter error: {data['error']}")
+                    raise GeminiError(f"{label} error: {data['error']}")
 
                 choice = data["choices"][0]["message"]
                 text = choice.get("content") or ""
@@ -118,7 +140,7 @@ class GeminiClient:
 
                 if is_rate_limit and attempt < settings.GEMINI_MAX_RETRIES - 1:
                     wait = settings.GEMINI_RETRY_DELAY * (2 ** attempt)
-                    logger.warning(f"Rate limit, retrying in {wait}s (attempt {attempt + 1}/{settings.GEMINI_MAX_RETRIES})")
+                    logger.warning(f"[{label}] Rate limit, retrying in {wait}s (attempt {attempt + 1}/{settings.GEMINI_MAX_RETRIES})")
                     await asyncio.sleep(wait)
                     continue
 
@@ -126,7 +148,7 @@ class GeminiClient:
                     await asyncio.sleep(settings.GEMINI_RETRY_DELAY)
                     continue
 
-                logger.error(f"LLM failed after {settings.GEMINI_MAX_RETRIES} attempts: {e}")
+                logger.error(f"[{label}] LLM failed after {settings.GEMINI_MAX_RETRIES} attempts: {e}")
                 raise GeminiError(f"LLM API failed: {str(e)}")
 
         raise GeminiError(f"LLM API failed after all retries. Last: {last_error}")
@@ -242,6 +264,9 @@ class GeminiClient:
 
         last_error = None
         client = _get_client()
+        api_url = _get_api_url()
+        headers = _get_headers()
+        label = _provider_label()
 
         payload = {
             "model": settings.GEMINI_MODEL,
@@ -250,31 +275,20 @@ class GeminiClient:
             "max_tokens": settings.GEMINI_MAX_OUTPUT_TOKENS,
         }
 
-        headers = {
-            "Authorization": f"Bearer {settings.GEMINI_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://campusiq.edu",
-            "X-Title": "CampusIQ",
-        }
-
         for attempt in range(settings.GEMINI_MAX_RETRIES):
             try:
-                resp = await client.post(
-                    f"{settings.OPENROUTER_BASE_URL}/chat/completions",
-                    json=payload,
-                    headers=headers,
-                )
+                resp = await client.post(api_url, json=payload, headers=headers)
 
                 if resp.status_code == 429:
                     await asyncio.sleep(settings.GEMINI_RETRY_DELAY * (2 ** attempt))
                     continue
 
                 if resp.status_code >= 400:
-                    raise GeminiError(f"OpenRouter error {resp.status_code}: {resp.text[:300]}")
+                    raise GeminiError(f"{label} error {resp.status_code}: {resp.text[:300]}")
 
                 data = resp.json()
                 if "error" in data:
-                    raise GeminiError(f"OpenRouter error: {data['error']}")
+                    raise GeminiError(f"{label} error: {data['error']}")
 
                 choice = data["choices"][0]["message"]
                 text = choice.get("content") or ""
@@ -307,12 +321,14 @@ class GeminiClient:
             )
             return {
                 "status": "healthy",
+                "provider": settings.LLM_PROVIDER,
                 "model": settings.GEMINI_MODEL,
                 "response": response.strip()
             }
         except Exception as e:
             return {
                 "status": "unhealthy",
+                "provider": settings.LLM_PROVIDER,
                 "model": settings.GEMINI_MODEL,
                 "error": str(e)
             }

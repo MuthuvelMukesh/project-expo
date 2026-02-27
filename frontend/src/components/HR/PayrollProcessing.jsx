@@ -27,9 +27,9 @@ const PayrollProcessing = ({ onSuccess }) => {
     try {
       setLoading(true);
       const response = await api.get('/api/hr/employees');
-      setEmployees(response.data);
+      setEmployees(Array.isArray(response) ? response : []);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load employees');
+      setError(err.message || 'Failed to load employees');
     } finally {
       setLoading(false);
     }
@@ -87,7 +87,7 @@ const PayrollProcessing = ({ onSuccess }) => {
         }));
       }, 2000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to process payroll');
+      setError(err.message || 'Failed to process payroll');
     } finally {
       setProcessing(false);
     }

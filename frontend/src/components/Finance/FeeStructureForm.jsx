@@ -56,7 +56,7 @@ const FeeStructureForm = ({ onSuccess }) => {
       if (onSuccess) onSuccess();
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create fee structure');
+      setError(err.message || 'Failed to create fee structure');
     } finally {
       setLoading(false);
     }

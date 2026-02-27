@@ -61,6 +61,30 @@ class ApiService {
         return data ?? {};
     }
 
+    // ─── Generic convenience methods ─────────────────────────
+    // These handle paths with or without the /api prefix
+    _normalizePath(path) {
+        return path.startsWith('/api/') ? path.slice(4) : path;
+    }
+
+    async get(url) {
+        return this.request(this._normalizePath(url));
+    }
+
+    async post(url, body = {}) {
+        return this.request(this._normalizePath(url), {
+            method: 'POST',
+            body: JSON.stringify(body),
+        });
+    }
+
+    async put(url, body = {}) {
+        return this.request(this._normalizePath(url), {
+            method: 'PUT',
+            body: JSON.stringify(body),
+        });
+    }
+
     // ─── Auth ────────────────────────────────────────────────
     async login(email, password) {
         return this.request('/auth/login', {
@@ -300,11 +324,11 @@ class ApiService {
 
     // ─── Export ──────────────────────────────────────────────
     getExportUrl(type, id = null) {
-        const token = this.getToken();
+        // Auth is handled via httpOnly cookies (credentials: 'include')
         const base = '/api/export';
-        if (type === 'students') return `${base}/students?token=${token}`;
-        if (type === 'attendance') return `${base}/attendance/${id}?token=${token}`;
-        if (type === 'risk-roster') return `${base}/risk-roster/${id}?token=${token}`;
+        if (type === 'students') return `${base}/students`;
+        if (type === 'attendance') return `${base}/attendance/${id}`;
+        if (type === 'risk-roster') return `${base}/risk-roster/${id}`;
         return base;
     }
 
@@ -337,8 +361,10 @@ class ApiService {
     }
 
     async getInvoices(studentId = null) {
-        const q = studentId ? `?student_id=${studentId}` : '';
-        return this.request(`/finance/invoices${q}`);
+        if (studentId) {
+            return this.request(`/finance/invoices/student/${studentId}`);
+        }
+        return this.request('/finance/invoices');
     }
 
     async recordPayment(data) {
@@ -430,8 +456,11 @@ class ApiService {
 
     async getPayrollReport(reportType, month = null, year = null) {
         // reportType: 'summary', 'slip'
-        const q = (month || year) ? `?${month ? `month=${month}` : ''}${year ? `&year=${year}` : ''}` : '';
-        return this.request(`/hr/reports/${reportType}${q}`);
+        const params = new URLSearchParams();
+        if (month) params.set('month', month);
+        if (year) params.set('year', year);
+        const q = params.toString();
+        return this.request(`/hr/reports/${reportType}${q ? `?${q}` : ''}`);
     }
 
     async recordEmployeeAttendance(data) {
@@ -443,8 +472,106 @@ class ApiService {
     }
 
     async getEmployeeAttendance(employeeId, month = null, year = null) {
-        const q = (month || year) ? `?${month ? `month=${month}` : ''}${year ? `&year=${year}` : ''}` : '';
-        return this.request(`/hr/attendance/${employeeId}${q}`);
+        const params = new URLSearchParams();
+        if (month) params.set('month', month);
+        if (year) params.set('year', year);
+        const q = params.toString();
+        return this.request(`/hr/attendance/${employeeId}${q ? `?${q}` : ''}`);
+    }
+
+    // ─── Employee Update & Delete ──────────────────────────────
+    async deleteEmployee(employeeId) {
+        return this.request(`/hr/employees/${employeeId}`, { method: 'DELETE' });
+    }
+
+    // ─── Employee Directory ────────────────────────────────────
+    async getEmployeeDirectory(search = null, employeeType = null) {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (employeeType) params.set('employee_type', employeeType);
+        const q = params.toString();
+        return this.request(`/hr/directory${q ? `?${q}` : ''}`);
+    }
+
+    // ─── Attendance Summary ────────────────────────────────────
+    async getAttendanceSummary(employeeId, month = null, year = null) {
+        const params = new URLSearchParams();
+        if (month) params.set('month', month);
+        if (year) params.set('year', year);
+        const q = params.toString();
+        return this.request(`/hr/attendance-summary/${employeeId}${q ? `?${q}` : ''}`);
+    }
+
+    async updateAttendance(recordId, data) {
+        return this.request(`/hr/attendance/${recordId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    // ─── Leave Management ──────────────────────────────────────
+    async createLeaveType(data) {
+        return this.request('/hr/leave-types', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getLeaveTypes() {
+        return this.request('/hr/leave-types');
+    }
+
+    async updateLeaveType(leaveTypeId, data) {
+        return this.request(`/hr/leave-types/${leaveTypeId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async initializeLeaveBalances(employeeId, year) {
+        return this.request(`/hr/leave-balances/initialize?employee_id=${employeeId}&year=${year}`, {
+            method: 'POST',
+        });
+    }
+
+    async getLeaveBalances(employeeId, year = null) {
+        const params = new URLSearchParams();
+        if (year) params.set('year', year);
+        const q = params.toString();
+        return this.request(`/hr/leave-balances/${employeeId}${q ? `?${q}` : ''}`);
+    }
+
+    async createLeaveRequest(data) {
+        return this.request('/hr/leave-requests', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async getLeaveRequests(employeeId = null, statusFilter = null) {
+        const params = new URLSearchParams();
+        if (employeeId) params.set('employee_id', employeeId);
+        if (statusFilter) params.set('status_filter', statusFilter);
+        const q = params.toString();
+        return this.request(`/hr/leave-requests${q ? `?${q}` : ''}`);
+    }
+
+    async reviewLeaveRequest(requestId, data) {
+        return this.request(`/hr/leave-requests/${requestId}/review`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+
+    async cancelLeaveRequest(requestId) {
+        return this.request(`/hr/leave-requests/${requestId}/cancel`, {
+            method: 'PUT',
+        });
+    }
+
+    // ─── Staff Self-Service ────────────────────────────────────
+    async getMyEmployeeProfile() {
+        return this.request('/hr/my-profile');
     }
 }
 

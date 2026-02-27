@@ -6,7 +6,7 @@ import './HR.css';
  * HRDashboard - Main HR and payroll management dashboard
  * Shows employee count, payroll status, salary reports
  */
-const HRDashboard = ({ isAdmin }) => {
+const HRDashboard = ({ isAdmin, onNavigate }) => {
   const [dashboard, setDashboard] = useState({
     totalEmployees: 0,
     thisMonthPayroll: {},
@@ -31,10 +31,10 @@ const HRDashboard = ({ isAdmin }) => {
       const payrollRes = await api.get(`/api/hr/reports/payroll-summary?month=${month}&year=${year}`);
       
       setDashboard({
-        totalEmployees: payrollRes.data.total_employees || 0,
-        thisMonthPayroll: payrollRes.data || {},
-        pendingPayrolls: payrollRes.data.pending_records || [],
-        recentSalarySlips: payrollRes.data.recent_slips || [],
+        totalEmployees: payrollRes.total_employees || 0,
+        thisMonthPayroll: payrollRes || {},
+        pendingPayrolls: payrollRes.pending_records || [],
+        recentSalarySlips: payrollRes.recent_slips || [],
         loading: false,
         error: null,
       });
@@ -42,7 +42,7 @@ const HRDashboard = ({ isAdmin }) => {
       setDashboard(prev => ({
         ...prev,
         loading: false,
-        error: error.response?.data?.detail || 'Failed to load HR dashboard',
+        error: error.message || 'Failed to load HR dashboard',
       }));
     }
   };
@@ -73,7 +73,7 @@ const HRDashboard = ({ isAdmin }) => {
           <div className="payroll-stats">
             <div className="stat">
               <span className="label">Total Gross</span>
-              <span className="value">₹{(dashboard.thisMonthPayroll.total_gross || 0).toFixed(2)}</span>
+              <span className="value">₹{(dashboard.thisMonthPayroll.total_gross_salary || 0).toFixed(2)}</span>
             </div>
             <div className="stat">
               <span className="label">Total Deductions</span>
@@ -81,7 +81,7 @@ const HRDashboard = ({ isAdmin }) => {
             </div>
             <div className="stat">
               <span className="label">Net Payroll</span>
-              <span className="value">₹{(dashboard.thisMonthPayroll.total_net || 0).toFixed(2)}</span>
+              <span className="value">₹{(dashboard.thisMonthPayroll.total_net_salary || 0).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -90,9 +90,9 @@ const HRDashboard = ({ isAdmin }) => {
         <div className="card actions-card">
           <h3>Quick Actions</h3>
           <div className="action-buttons">
-            <button className="btn-primary">Add Employee</button>
-            <button className="btn-primary">Process Payroll</button>
-            <button className="btn-secondary">View Reports</button>
+            <button className="btn-primary" onClick={() => onNavigate && onNavigate('employees')}>Add Employee</button>
+            <button className="btn-primary" onClick={() => onNavigate && onNavigate('payroll')}>Process Payroll</button>
+            <button className="btn-secondary" onClick={() => onNavigate && onNavigate('directory')}>View Directory</button>
           </div>
         </div>
       </div>

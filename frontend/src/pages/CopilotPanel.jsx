@@ -263,7 +263,7 @@ export default function CopilotPanel() {
                     }}>
                         <div style={{
                             width: 60, height: 4, borderRadius: 2,
-                            background: 'rgba(148,163,184,0.15)',
+                            background: 'var(--bg-tertiary)',
                             overflow: 'hidden',
                         }}>
                             <div style={{
@@ -355,7 +355,7 @@ export default function CopilotPanel() {
                             style={{
                                 display: 'flex', alignItems: 'center', gap: 6,
                                 padding: '6px 12px', borderRadius: 8,
-                                border: '1px solid rgba(148,163,184,0.2)',
+                                border: '1px solid var(--border-color)',
                                 background: showHistory ? 'rgba(124,58,237,0.12)' : 'transparent',
                                 color: showHistory ? '#A78BFA' : 'var(--text-muted)',
                                 cursor: 'pointer', fontSize: 13,
@@ -387,13 +387,13 @@ export default function CopilotPanel() {
                                         onClick={() => handleSuggestion(s)}
                                         style={{
                                             padding: '8px 14px', borderRadius: 20,
-                                            border: '1px solid rgba(148,163,184,0.2)',
-                                            background: 'rgba(148,163,184,0.06)',
-                                            color: 'var(--text-muted)', cursor: 'pointer',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-tertiary)',
+                                            color: 'var(--text-secondary)', cursor: 'pointer',
                                             fontSize: 13, transition: 'all 0.15s',
                                         }}
-                                        onMouseEnter={e => { e.target.style.borderColor = '#7C3AED44'; e.target.style.color = '#A78BFA'; }}
-                                        onMouseLeave={e => { e.target.style.borderColor = 'rgba(148,163,184,0.2)'; e.target.style.color = 'var(--text-muted)'; }}
+                                        onMouseEnter={e => { e.target.style.borderColor = '#7C3AED'; e.target.style.color = '#7C3AED'; }}
+                                        onMouseLeave={e => { e.target.style.borderColor = 'var(--border-color)'; e.target.style.color = 'var(--text-secondary)'; }}
                                     >{s}</button>
                                 ))}
                             </div>
@@ -411,8 +411,8 @@ export default function CopilotPanel() {
                                 borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                                 background: msg.role === 'user'
                                     ? 'linear-gradient(135deg, #7C3AED, #2563EB)'
-                                    : 'rgba(15,23,42,0.6)',
-                                border: msg.role === 'user' ? 'none' : '1px solid rgba(148,163,184,0.12)',
+                                    : 'var(--card-bg)',
+                                border: msg.role === 'user' ? 'none' : '1px solid var(--border-color)',
                                 color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
                                 fontSize: 14,
                             }}>
@@ -432,7 +432,7 @@ export default function CopilotPanel() {
                         <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
                             <div style={{
                                 padding: '12px 16px', borderRadius: '16px 16px 16px 4px',
-                                background: 'rgba(15,23,42,0.6)', border: '1px solid rgba(148,163,184,0.12)',
+                                background: 'var(--card-bg)', border: '1px solid var(--border-color)',
                                 display: 'flex', gap: 8, alignItems: 'center', color: '#94A3B8',
                             }}>
                                 <Loader size={16} className="spin" /> Executing...
@@ -446,8 +446,8 @@ export default function CopilotPanel() {
                 {/* Input area */}
                 <div style={{
                     flexShrink: 0, padding: '12px 20px 16px',
-                    borderTop: '1px solid rgba(148,163,184,0.1)',
-                    background: 'rgba(15,23,42,0.3)',
+                    borderTop: '1px solid var(--border-color)',
+                    background: 'var(--bg-elevated)',
                 }}>
                     {/* Module pills */}
                     <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -457,9 +457,9 @@ export default function CopilotPanel() {
                                 onClick={() => setModule(m.value)}
                                 style={{
                                     padding: '4px 12px', borderRadius: 16, fontSize: 12,
-                                    border: `1px solid ${module === m.value ? '#7C3AED44' : 'rgba(148,163,184,0.15)'}`,
-                                    background: module === m.value ? 'rgba(124,58,237,0.12)' : 'transparent',
-                                    color: module === m.value ? '#A78BFA' : 'var(--text-muted)',
+                                    border: `1px solid ${module === m.value ? '#7C3AED66' : 'var(--border-color)'}`,
+                                    background: module === m.value ? 'rgba(124,58,237,0.15)' : 'var(--bg-secondary)',
+                                    color: module === m.value ? '#7C3AED' : 'var(--text-secondary)',
                                     cursor: 'pointer', transition: 'all 0.15s',
                                 }}
                             >{m.emoji} {m.label}</button>
@@ -477,21 +477,21 @@ export default function CopilotPanel() {
                             rows={1}
                             style={{
                                 flex: 1, padding: '10px 14px', borderRadius: 12,
-                                border: '1px solid rgba(148,163,184,0.2)',
-                                background: 'rgba(15,23,42,0.4)',
+                                border: '1px solid var(--border-color)',
+                                background: 'var(--bg-secondary)',
                                 color: 'var(--text-primary)', fontSize: 14,
                                 resize: 'none', outline: 'none', fontFamily: 'inherit',
                                 minHeight: 42, maxHeight: 120,
                             }}
-                            onFocus={e => e.target.style.borderColor = '#7C3AED55'}
-                            onBlur={e => e.target.style.borderColor = 'rgba(148,163,184,0.2)'}
+                            onFocus={e => e.target.style.borderColor = '#7C3AED'}
+                            onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
                         />
                         <button
                             onClick={handleSend}
                             disabled={!input.trim() || sending}
                             style={{
                                 width: 42, height: 42, borderRadius: 12, border: 'none',
-                                background: input.trim() ? 'linear-gradient(135deg, #7C3AED, #2563EB)' : 'rgba(148,163,184,0.1)',
+                                background: input.trim() ? 'linear-gradient(135deg, #7C3AED, #2563EB)' : 'var(--bg-tertiary)',
                                 color: input.trim() ? 'white' : '#64748B',
                                 cursor: input.trim() ? 'pointer' : 'not-allowed',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -507,12 +507,12 @@ export default function CopilotPanel() {
                 {showHistory && (
                     <div style={{
                         position: 'fixed', top: 0, right: 0, bottom: 0, width: 440,
-                        background: 'rgba(10,15,30,0.98)', borderLeft: '1px solid rgba(148,163,184,0.12)',
+                        background: 'var(--bg-primary)', borderLeft: '1px solid var(--border-color)',
                         zIndex: 100, display: 'flex', flexDirection: 'column',
                         boxShadow: '-4px 0 20px rgba(0,0,0,0.4)',
                     }}>
                         <div style={{
-                            padding: '16px 20px', borderBottom: '1px solid rgba(148,163,184,0.1)',
+                            padding: '16px 20px', borderBottom: '1px solid var(--border-color)',
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -547,7 +547,7 @@ export default function CopilotPanel() {
                                 <option value="ANALYZE">Analyze</option>
                             </select>
                             <button onClick={loadHistory} style={{
-                                padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(148,163,184,0.2)',
+                                padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-color)',
                                 background: 'rgba(124,58,237,0.12)', color: '#A78BFA',
                                 cursor: 'pointer', fontSize: 12,
                             }}>
@@ -571,8 +571,8 @@ export default function CopilotPanel() {
                                 return (
                                     <div key={i} style={{
                                         padding: '10px 12px', borderRadius: 8, marginBottom: 6,
-                                        border: '1px solid rgba(148,163,184,0.08)',
-                                        background: 'rgba(15,23,42,0.4)',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-secondary)',
                                     }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                             <span style={{ fontSize: 12, color: evtColor, fontWeight: 600 }}>
@@ -614,8 +614,8 @@ export default function CopilotPanel() {
 
 const filterSelectStyle = {
     padding: '4px 8px', borderRadius: 6, fontSize: 12,
-    border: '1px solid rgba(148,163,184,0.2)',
-    background: 'rgba(15,23,42,0.6)', color: 'var(--text-muted)',
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
     outline: 'none',
 };
 
@@ -625,17 +625,17 @@ function DataTable({ rows }) {
     const display = rows.slice(0, 50);
 
     return (
-        <div style={{ overflowX: 'auto', marginTop: 8, borderRadius: 8, border: '1px solid rgba(148,163,184,0.1)' }}>
+        <div style={{ overflowX: 'auto', marginTop: 8, borderRadius: 8, border: '1px solid var(--border-color)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                     <tr>
                         {headers.map(h => (
                             <th key={h} style={{
                                 padding: '6px 10px', textAlign: 'left', fontWeight: 600,
-                                borderBottom: '1px solid rgba(148,163,184,0.15)',
-                                color: '#94A3B8', whiteSpace: 'nowrap',
+                                borderBottom: '1px solid var(--border-color)',
+                                color: 'var(--text-secondary)', whiteSpace: 'nowrap',
                                 position: 'sticky', top: 0,
-                                background: 'rgba(15,23,42,0.95)',
+                                background: 'var(--bg-elevated)',
                             }}>{h.replace(/_/g, ' ')}</th>
                         ))}
                     </tr>
@@ -645,7 +645,7 @@ function DataTable({ rows }) {
                         <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(148,163,184,0.03)' }}>
                             {headers.map(h => (
                                 <td key={h} style={{
-                                    padding: '5px 10px', borderBottom: '1px solid rgba(148,163,184,0.06)',
+                                    padding: '5px 10px', borderBottom: '1px solid var(--border-subtle)',
                                     color: 'var(--text-primary)', whiteSpace: 'nowrap',
                                     maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis',
                                 }}>{String(row[h] ?? '')}</td>
@@ -698,7 +698,7 @@ function DiffView({ before, after }) {
             <button onClick={() => setShow(s => !s)} style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '4px 10px', borderRadius: 6,
-                border: '1px solid rgba(148,163,184,0.15)',
+                border: '1px solid var(--border-color)',
                 background: 'transparent', color: '#64B5F6',
                 cursor: 'pointer', fontSize: 12,
             }}>
@@ -714,7 +714,7 @@ function DiffView({ before, after }) {
                         return (
                             <div key={i} style={{
                                 padding: '6px 10px', borderRadius: 6, marginBottom: 4,
-                                border: '1px solid rgba(148,163,184,0.1)', fontSize: 12,
+                                border: '1px solid var(--border-color)', fontSize: 12,
                             }}>
                                 <span style={{ color: '#94A3B8' }}>ID {b.id}: </span>
                                 {changed.map(k => (

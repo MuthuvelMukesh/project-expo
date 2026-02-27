@@ -26,6 +26,8 @@ export default function StudentProfile() {
     }, []);
 
     const handleSave = async () => {
+        setError('');
+        setSuccess('');
         try {
             await api.updateStudentProfile(form);
             setSuccess('Profile updated!');

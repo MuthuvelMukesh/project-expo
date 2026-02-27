@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard, BookOpen, Users, BarChart3,
     GraduationCap, Shield, LogOut, Bot, CalendarCheck, Terminal,
-    User, Building2, CalendarDays, Download, DollarSign, Briefcase
+    User, Building2, CalendarDays, Download, DollarSign, Briefcase, ClipboardList
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
@@ -20,6 +20,7 @@ const navConfig = {
     faculty: [
         { to: '/faculty', icon: BookOpen, label: 'My Classes' },
         { to: '/timetable', icon: CalendarCheck, label: 'Timetable' },
+        { to: '/my-portal', icon: ClipboardList, label: 'My Portal' },
         { to: '/copilot', icon: Terminal, label: 'Command Console' },
     ],
     admin: [
@@ -29,6 +30,7 @@ const navConfig = {
         { to: '/manage-departments', icon: Building2, label: 'Departments' },
         { to: '/finance', icon: DollarSign, label: 'Finance' },
         { to: '/hr', icon: Briefcase, label: 'HR & Payroll' },
+        { to: '/my-portal', icon: ClipboardList, label: 'My Portal' },
         { to: '/copilot', icon: Terminal, label: 'Command Console' },
         { to: '/governance', icon: Shield, label: 'Governance' },
     ],

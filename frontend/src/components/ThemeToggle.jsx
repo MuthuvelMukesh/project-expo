@@ -18,8 +18,8 @@ export default function ThemeToggle() {
                 color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
                 transition: 'color 0.2s',
             }}
-            onMouseOver={e => e.target.style.color = 'var(--primary)'}
-            onMouseOut={e => e.target.style.color = 'var(--text-secondary)'}
+            onMouseOver={e => e.currentTarget.style.color = 'var(--primary)'}
+            onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
         >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>

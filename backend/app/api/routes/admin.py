@@ -5,8 +5,8 @@ Campus-wide KPIs, department analytics, and alert center.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from datetime import datetime, timezone
+from sqlalchemy import select, func, case, and_
+from datetime import datetime, timezone, date, timedelta
 
 from app.core.database import get_db
 from app.api.dependencies import require_role
@@ -30,6 +30,9 @@ async def get_admin_dashboard(
     departments = (await db.execute(select(Department))).scalars().all()
     dept_kpis = []
 
+    # Date range for recent attendance (last 30 days)
+    thirty_days_ago = date.today() - timedelta(days=30)
+
     for dept in departments:
         dept_students = (await db.execute(
             select(func.count(Student.id)).where(Student.department_id == dept.id)
@@ -44,19 +47,51 @@ async def get_admin_dashboard(
             select(func.avg(Student.cgpa)).where(Student.department_id == dept.id)
         )).scalar() or 0
 
+        # Real attendance: compute from attendance table for dept students
+        dept_student_ids = select(Student.id).where(Student.department_id == dept.id)
+        total_att = (await db.execute(
+            select(func.count(Attendance.id)).where(
+                and_(
+                    Attendance.student_id.in_(dept_student_ids),
+                    Attendance.date >= thirty_days_ago,
+                )
+            )
+        )).scalar() or 0
+        present_att = (await db.execute(
+            select(func.count(Attendance.id)).where(
+                and_(
+                    Attendance.student_id.in_(dept_student_ids),
+                    Attendance.date >= thirty_days_ago,
+                    Attendance.is_present == True,
+                )
+            )
+        )).scalar() or 0
+        avg_attendance = round((present_att / total_att * 100), 1) if total_att > 0 else 0.0
+
+        # Real high-risk %: students with latest prediction risk_score > 0.5
+        high_risk_count = (await db.execute(
+            select(func.count(func.distinct(Prediction.student_id))).where(
+                and_(
+                    Prediction.student_id.in_(dept_student_ids),
+                    Prediction.risk_score > 0.5,
+                )
+            )
+        )).scalar() or 0
+        high_risk_pct = round((high_risk_count / dept_students * 100), 1) if dept_students > 0 else 0.0
+
         dept_kpis.append({
             "department_id": dept.id,
             "department_name": dept.name,
             "department_code": dept.code,
             "total_students": dept_students,
             "total_faculty": dept_faculty,
-            "avg_attendance": round(float(75 + (dept.id * 3) % 20), 1),  # Demo data
-            "high_risk_pct": round(float(5 + (dept.id * 7) % 25), 1),  # Demo data
+            "avg_attendance": avg_attendance,
+            "high_risk_pct": high_risk_pct,
             "avg_cgpa": round(float(avg_cgpa), 2),
         })
 
-    # Generate alerts
-    alerts = _generate_demo_alerts(dept_kpis)
+    # Generate real alerts from data
+    alerts = _generate_alerts(dept_kpis)
 
     campus_avg_att = (
         sum(d["avg_attendance"] for d in dept_kpis) / len(dept_kpis)
@@ -78,8 +113,8 @@ async def get_admin_dashboard(
     }
 
 
-def _generate_demo_alerts(dept_kpis: list) -> list:
-    """Generate AI-style alerts from department KPIs."""
+def _generate_alerts(dept_kpis: list) -> list:
+    """Generate real alerts from department KPIs."""
     alerts = []
     alert_id = 1
 
@@ -102,6 +137,18 @@ def _generate_demo_alerts(dept_kpis: list) -> list:
                 "alert_type": "low_attendance",
                 "severity": "warning",
                 "message": f"{dept['department_name']} average attendance is {dept['avg_attendance']}% — below campus target of 80%.",
+                "department": dept["department_name"],
+                "student_name": None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            alert_id += 1
+
+        if dept["avg_cgpa"] < 6.0:
+            alerts.append({
+                "id": alert_id,
+                "alert_type": "low_performance",
+                "severity": "warning",
+                "message": f"{dept['department_name']} average CGPA is {dept['avg_cgpa']} — below acceptable threshold of 6.0.",
                 "department": dept["department_name"],
                 "student_name": None,
                 "created_at": datetime.now(timezone.utc).isoformat(),

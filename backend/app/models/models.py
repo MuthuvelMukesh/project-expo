@@ -396,6 +396,61 @@ class EmployeeAttendance(Base):
     employee = relationship("Employee")
 
 
+class LeaveType(Base):
+    """Leave type definitions (Casual, Sick, Earned, etc.)."""
+    __tablename__ = "leave_types"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), unique=True, nullable=False)          # Casual Leave, Sick Leave, etc.
+    code = Column(String(10), unique=True, nullable=False)          # CL, SL, EL, etc.
+    max_days_per_year = Column(Integer, nullable=False, default=12)
+    is_carry_forward = Column(Boolean, default=False)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LeaveBalance(Base):
+    """Tracks per-employee, per-year leave balances."""
+    __tablename__ = "leave_balances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    leave_type_id = Column(Integer, ForeignKey("leave_types.id"), nullable=False)
+    year = Column(Integer, nullable=False)
+    total_days = Column(Integer, nullable=False)
+    used_days = Column(Integer, default=0)
+    remaining_days = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+    leave_type = relationship("LeaveType")
+
+
+class LeaveRequest(Base):
+    """Employee leave applications with approval workflow."""
+    __tablename__ = "leave_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey("employees.id"), nullable=False)
+    leave_type_id = Column(Integer, ForeignKey("leave_types.id"), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    num_days = Column(Float, nullable=False)                        # supports half-day (0.5)
+    reason = Column(Text, nullable=True)
+    status = Column(String(20), default="pending")                  # pending, approved, rejected, cancelled
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    review_comment = Column(Text, nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+    leave_type = relationship("LeaveType")
+    reviewer = relationship("User")
+
+
 # ─────── CONVERSATIONAL OPERATIONAL AI LAYER ───────────────────
 
 

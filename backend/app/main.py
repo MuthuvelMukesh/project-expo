@@ -11,13 +11,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 
-from app.services.gemini_pool_service import close_http_client
+from app.services.gemini_pool_service import close_http_client, GeminiClient
+from app.core.config import get_settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle - startup and shutdown events."""
     # Startup
+    _settings = get_settings()
+    print(f"  ✅  LLM Provider: {_settings.LLM_PROVIDER}")
+    print(f"  ✅  LLM Model:    {_settings.GEMINI_MODEL}")
     yield
     # Shutdown - cleanup resources
     await close_http_client()
@@ -55,6 +59,12 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/health/llm", tags=["Health"])
+async def llm_health_check():
+    """Check if the LLM API key and model are working."""
+    return await GeminiClient.health_check()
 
 
 # ----- Route Registration -----

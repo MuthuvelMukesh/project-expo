@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import './Finance.css';
 
 /**
  * FinanceDashboard - Main finance overview for admins and students
  * Shows balance, outstanding fees, payment history, and quick actions
  */
-const FinanceDashboard = ({ isAdmin }) => {
+const FinanceDashboard = ({ isAdmin, onNavigate }) => {
+  const { user } = useAuth();
+  const [studentId, setStudentId] = useState(null);
   const [dashboard, setDashboard] = useState({
     totalBalance: 0,
     outstandingFees: [],
@@ -16,8 +19,21 @@ const FinanceDashboard = ({ isAdmin }) => {
   });
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (!isAdmin && user) {
+      // Fetch student profile to get the student_id
+      api.getStudentDashboard()
+        .then(data => {
+          setStudentId(data.student?.id);
+        })
+        .catch(() => setStudentId(null));
+    }
+  }, [isAdmin, user]);
+
+  useEffect(() => {
+    if (isAdmin || studentId) {
+      fetchDashboardData();
+    }
+  }, [isAdmin, studentId]);
 
   const fetchDashboardData = async () => {
     try {
@@ -25,21 +41,21 @@ const FinanceDashboard = ({ isAdmin }) => {
       
       if (isAdmin) {
         const outstandingRes = await api.get('/api/finance/reports/outstanding');
-        const collectionRes = await api.get('/api/finance/reports/collection');
+        const collectionRes = await api.get('/api/finance/reports/collections');
         
         setDashboard({
-          totalBalance: collectionRes.data.total_outstanding || 0,
-          outstandingFees: outstandingRes.data.outstanding_dues || [],
-          recentPayments: collectionRes.data.recent_payments || [],
+          totalBalance: outstandingRes.total_outstanding || 0,
+          outstandingFees: outstandingRes.dues || [],
+          recentPayments: collectionRes.collections || [],
           loading: false,
           error: null,
         });
-      } else {
-        const balanceRes = await api.get(`/api/finance/student-balance/${getCurrentStudentId()}`);
+      } else if (studentId) {
+        const balanceRes = await api.get(`/api/finance/student-balance/${studentId}`);
         setDashboard({
-          totalBalance: balanceRes.data.outstanding_balance || 0,
-          outstandingFees: balanceRes.data.outstanding_fees || [],
-          recentPayments: balanceRes.data.paid_fees || [],
+          totalBalance: balanceRes.total_outstanding || 0,
+          outstandingFees: [],
+          recentPayments: [],
           loading: false,
           error: null,
         });
@@ -48,7 +64,7 @@ const FinanceDashboard = ({ isAdmin }) => {
       setDashboard(prev => ({
         ...prev,
         loading: false,
-        error: error.response?.data?.detail || 'Failed to load dashboard',
+        error: error.message || 'Failed to load dashboard',
       }));
     }
   };
@@ -81,15 +97,15 @@ const FinanceDashboard = ({ isAdmin }) => {
           <div className="action-buttons">
             {isAdmin ? (
               <>
-                <button className="btn-primary">Generate Invoices</button>
-                <button className="btn-primary">View Reports</button>
-                <button className="btn-secondary">Fee Waivers</button>
+                <button className="btn-primary" onClick={() => onNavigate && onNavigate('invoices')}>Generate Invoices</button>
+                <button className="btn-primary" onClick={() => onNavigate && onNavigate('dashboard')}>View Reports</button>
+                <button className="btn-secondary" onClick={() => onNavigate && onNavigate('fees')}>Fee Structures</button>
               </>
             ) : (
               <>
-                <button className="btn-primary">View Invoices</button>
-                <button className="btn-primary">Pay Fees</button>
-                <button className="btn-secondary">Receipt History</button>
+                <button className="btn-primary" onClick={() => onNavigate && onNavigate('invoices')}>View Invoices</button>
+                <button className="btn-primary" onClick={() => onNavigate && onNavigate('payments')}>Pay Fees</button>
+                <button className="btn-secondary" onClick={fetchDashboardData}>Refresh Data</button>
               </>
             )}
           </div>
@@ -165,12 +181,6 @@ const FinanceDashboard = ({ isAdmin }) => {
       </div>
     </div>
   );
-};
-
-// Helper function - get current student ID from context/session
-const getCurrentStudentId = () => {
-  // This would typically come from AuthContext or session
-  return localStorage.getItem('currentStudentId') || 1;
 };
 
 export default FinanceDashboard;

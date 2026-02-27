@@ -23,15 +23,15 @@ const InvoiceList = ({ studentId = null, isAdmin = false }) => {
 
       let url = '/api/finance/invoices';
       if (studentId && !isAdmin) {
-        url += `?student_id=${studentId}`;
+        url = `/api/finance/invoices/student/${studentId}`;
       }
 
       const response = await api.get(url);
       
-      let filtered = response.data;
+      let filtered = Array.isArray(response) ? response : [];
       
       if (filter !== 'all') {
-        filtered = response.data.filter(inv => {
+        filtered = filtered.filter(inv => {
           if (filter === 'pending') return inv.status === 'draft' || inv.status === 'issued';
           if (filter === 'paid') return inv.status === 'paid';
           if (filter === 'overdue') return new Date(inv.due_date) < new Date() && inv.status !== 'paid';
@@ -41,7 +41,7 @@ const InvoiceList = ({ studentId = null, isAdmin = false }) => {
 
       setInvoices(filtered);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load invoices');
+      setError(err.message || 'Failed to load invoices');
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ const InvoiceList = ({ studentId = null, isAdmin = false }) => {
       await api.post('/api/finance/invoices/generate', {});
       fetchInvoices();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to generate invoices');
+      alert(err.message || 'Failed to generate invoices');
     }
   };
 

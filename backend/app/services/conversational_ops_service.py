@@ -130,7 +130,7 @@ FIELD_RULES: dict[str, dict[str, Any]] = {
 
 def _now() -> datetime:
     """Return a timezone-naive UTC datetime (matches DB column type)."""
-    return datetime.utcnow()
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _json_extract(text: str) -> Optional[dict]:

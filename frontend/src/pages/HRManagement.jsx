@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import HRDashboard from '../components/HR/HRDashboard';
 import EmployeeForm from '../components/HR/EmployeeForm';
+import EmployeeDirectory from '../components/HR/EmployeeDirectory';
 import SalaryStructureForm from '../components/HR/SalaryStructureForm';
 import PayrollProcessing from '../components/HR/PayrollProcessing';
+import LeaveManagement from '../components/HR/LeaveManagement';
+import AttendanceManagement from '../components/HR/AttendanceManagement';
 import { useAuth } from '../context/AuthContext';
 import '../pages/ManagementPages.css';
 
@@ -45,10 +48,16 @@ const HRManagement = () => {
           Dashboard
         </button>
         <button 
+          className={`tab-btn ${activeTab === 'directory' ? 'active' : ''}`}
+          onClick={() => setActiveTab('directory')}
+        >
+          Directory
+        </button>
+        <button 
           className={`tab-btn ${activeTab === 'employees' ? 'active' : ''}`}
           onClick={() => setActiveTab('employees')}
         >
-          Employees
+          Add Employee
         </button>
         <button 
           className={`tab-btn ${activeTab === 'salary' ? 'active' : ''}`}
@@ -62,16 +71,35 @@ const HRManagement = () => {
         >
           Process Payroll
         </button>
+        <button 
+          className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}
+          onClick={() => setActiveTab('attendance')}
+        >
+          Attendance
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'leave' ? 'active' : ''}`}
+          onClick={() => setActiveTab('leave')}
+        >
+          Leave Management
+        </button>
       </div>
 
       {/* Tab Content */}
       <div className="tab-content">
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
-          <HRDashboard key={refreshKey} isAdmin={isAdmin} />
+          <HRDashboard key={refreshKey} isAdmin={isAdmin} onNavigate={setActiveTab} />
         )}
 
-        {/* Employees Tab */}
+        {/* Directory Tab */}
+        {activeTab === 'directory' && (
+          <div className="card">
+            <EmployeeDirectory onSuccess={handleRefresh} />
+          </div>
+        )}
+
+        {/* Add Employee Tab */}
         {activeTab === 'employees' && (
           <div className="card">
             <EmployeeForm onSuccess={handleRefresh} />
@@ -92,6 +120,20 @@ const HRManagement = () => {
         {activeTab === 'payroll' && (
           <div className="card">
             <PayrollProcessing onSuccess={handleRefresh} />
+          </div>
+        )}
+
+        {/* Attendance Tab */}
+        {activeTab === 'attendance' && (
+          <div className="card">
+            <AttendanceManagement onSuccess={handleRefresh} />
+          </div>
+        )}
+
+        {/* Leave Management Tab */}
+        {activeTab === 'leave' && (
+          <div className="card">
+            <LeaveManagement onSuccess={handleRefresh} />
           </div>
         )}
       </div>

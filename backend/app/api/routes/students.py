@@ -114,6 +114,10 @@ async def update_my_profile(
 
     if "section" in updates:
         student.section = updates["section"]
+    if "semester" in updates:
+        student.semester = updates["semester"]
+    if "department_id" in updates:
+        student.department_id = updates["department_id"]
     if "full_name" in updates:
         current_user.full_name = updates["full_name"]
 

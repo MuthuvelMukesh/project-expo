@@ -65,7 +65,7 @@ const FinanceManagement = () => {
       <div className="tab-content">
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
-          <FinanceDashboard key={refreshKey} isAdmin={isAdmin} />
+          <FinanceDashboard key={refreshKey} isAdmin={isAdmin} onNavigate={setActiveTab} />
         )}
 
         {/* Invoices Tab */}

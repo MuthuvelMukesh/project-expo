@@ -65,7 +65,7 @@ const EmployeeForm = ({ onSuccess, editingEmployee = null }) => {
         }
       }, 2000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save employee');
+      setError(err.message || 'Failed to save employee');
     } finally {
       setLoading(false);
     }

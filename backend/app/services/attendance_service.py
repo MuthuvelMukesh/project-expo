@@ -7,6 +7,7 @@ import secrets
 import time
 import io
 import base64
+import math
 from datetime import datetime, timezone, date as dt_date
 
 import qrcode
@@ -27,6 +28,8 @@ async def generate_qr(db: AsyncSession, course_id: int, faculty_id: int, valid_s
     course = result.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
+    if not faculty_id or course.instructor_id != faculty_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't teach this course")
 
     # Create a secure token
     token = secrets.token_urlsafe(32)
@@ -80,6 +83,7 @@ async def mark_attendance(db: AsyncSession, qr_token: str, student_id: int):
         method="qr",
     )
     db.add(attendance)
+    await db.flush()
     token_data["used_by"].add(student_id)
 
     return {"message": "Attendance marked successfully", "course_id": token_data["course_id"]}
@@ -121,7 +125,7 @@ async def get_student_attendance_summary(db: AsyncSession, student_id: int):
         attended = present.scalar() or 0
 
         pct = (attended / total_classes * 100) if total_classes > 0 else 100.0
-        needed = max(0, int((0.75 * total_classes - attended) / 0.25) + 1) if pct < 75 else 0
+        needed = max(0, math.ceil((0.75 * total_classes - attended) / 0.25)) if pct < 75 else 0
 
         summaries.append({
             "course_id": course.id,
