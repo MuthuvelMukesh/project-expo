@@ -39,11 +39,11 @@ CampusIQ is an **AI-First Intelligent College ERP** system that integrates:
 | **Student Dashboard** | CGPA, attendance, predictions, timetable | Students |
 | **Faculty Console** | Risk roster, QR attendance, course analytics | Faculty |
 | **Admin Panel** | User management, department stats, system overview | Admin |
-| **Command Console** | Natural language → database operations with approval | All roles |
+| **Command Console** | Natural language → database operations with audit | All roles |
 | **Chatbot** | Context-aware AI assistant with live data | All roles |
 | **Finance Management** | Fees, invoices, payments, ledgers | Students, Admin |
 | **HR & Payroll** | Employee records, salary structures, payslips | Admin |
-| **Governance Dashboard** | Audit logs, pending approvals, rollback | Admin |
+| **Governance Dashboard** | Audit logs, operation stats, rollback | Admin |
 
 ---
 
@@ -80,7 +80,7 @@ CampusIQ is an **AI-First Intelligent College ERP** system that integrates:
 │  │  Auth Service  │  │  NLP CRUD       │  │  Conversational Ops  │    │
 │  │  • JWT tokens  │  │  Engine         │  │  Service             │    │
 │  │  • Password    │  │  • Intent parse │  │  • Risk assessment   │    │
-│  │    hashing     │  │  • Query build  │  │  • Approval workflow │    │
+│  │    hashing     │  │  • Query build  │  │  • Direct execution  │    │
 │  └────────────────┘  │  • Keyword      │  │  • Audit logging     │    │
 │                      │    fallback     │  │  • Rollback support  │    │
 │  ┌────────────────┐  └─────────────────┘  └──────────────────────┘    │
@@ -94,10 +94,10 @@ CampusIQ is an **AI-First Intelligent College ERP** system that integrates:
 │  └────────────────┘  └─────────────────┘  └──────────────────────┘    │
 │                                   │                                     │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │                    LLM Client (GeminiPoolClient)                  │  │
-│  │  • OpenRouter (primary) — liquid/lfm-2.5-1.2b-thinking           │  │
-│  │  • Google Gemini (fallback) — gemini-2.0-flash                   │  │
-│  │  • Module-specific key pools for rate limit isolation            │  │
+│  │                    LLM Client (GeminiClient)                      │  │
+│  │  • Google Gemini — gemini-2.0-flash                               │  │
+│  │  • Single API key with exponential backoff retry                  │  │
+│  │  • Methods: ask_json() for structured output, ask() for text     │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 │                                   │                                     │
 ├───────────────────────────────────┼─────────────────────────────────────┤
@@ -106,7 +106,7 @@ CampusIQ is an **AI-First Intelligent College ERP** system that integrates:
 │  │     PostgreSQL 16       │◀─────┴─────▶│       Redis 7           │  │
 │  │  • Primary database     │             │  • QR token cache       │  │
 │  │  • Async SQLAlchemy     │             │  • Session store        │  │
-│  │  • 20+ tables           │             │  • Rate limiting        │  │
+│  │  • 20+ tables           │             │                         │  │
 │  │  • JSON columns for     │             │                         │  │
 │  │    flexible data        │             │                         │  │
 │  └─────────────────────────┘             └─────────────────────────┘  │
@@ -122,7 +122,7 @@ User: "Show all CSE students with CGPA below 6"
                     ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ 1. React Frontend                                                │
-│    POST /api/ops-ai/plan {message: "...", module: "nlp"}        │
+│    POST /api/ops-ai/execute {message: "...", module: "nlp"}        │
 │    Authorization: Bearer <JWT>                                   │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
@@ -130,7 +130,7 @@ User: "Show all CSE students with CGPA below 6"
 ┌─────────────────────────────────────────────────────────────────┐
 │ 2. FastAPI Router (operational_ai.py)                           │
 │    → Validate JWT → Extract user from token                     │
-│    → Call conversational_ops_service.create_operational_plan()  │
+│    → Call conversational_ops_service.create_and_execute()       │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
                                  ▼
@@ -140,24 +140,24 @@ User: "Show all CSE students with CGPA below 6"
 │    → _permission_gate() → Check role matrix                     │
 │    → _estimate_impact() → COUNT(*) query                        │
 │    → _classify_risk() → LOW/MEDIUM/HIGH                         │
-│    → _build_preview() → Affected records                        │
-│    → Save OperationalPlan to DB                                 │
+│    → Execute directly (no approval gates)                       │
+│    → Save results to DB                                         │
 │    → _audit() → Create audit log                                │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ 4. LLM Client (GeminiPoolClient)                                │
-│    → Check OPENROUTER_API_KEY exists                            │
-│    → POST https://openrouter.ai/api/v1/chat/completions         │
-│    → Parse JSON response: {intent, entity, filters, values}     │
+│ 4. LLM Client (GeminiClient)                                     │
+│    → Configure google.generativeai with GEMINI_API_KEY          │
+│    → Generate structured JSON: {intent, entity, filters, values} │
+│    → Exponential backoff retry on failure                       │
 └────────────────────────────────┬────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ 5. Response to Frontend                                          │
-│    {plan_id, intent, entity, risk_level, preview, status}       │
-│    If LOW risk + READ → auto_execution with data                │
+│    {plan_id, intent, entity, risk_level, status,                │
+│     affected_count, before_state, after_state, analysis}        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -197,8 +197,7 @@ User: "Show all CSE students with CGPA below 6"
 |-----------|------------|---------|
 | Containerization | Docker | Service isolation |
 | Orchestration | Docker Compose | Multi-container deployment |
-| LLM (Primary) | OpenRouter | NLP parsing, chatbot |
-| LLM (Fallback) | Google Gemini | Backup LLM provider |
+| LLM | Google Gemini | NLP parsing, chatbot |
 
 ---
 
@@ -265,7 +264,6 @@ User: "Show all CSE students with CGPA below 6"
 |-------|---------|-------------|
 | `operational_plans` | Command Console plans | plan_id, message, intent_type, entity, filters, risk_level, status |
 | `operational_executions` | Execution records | execution_id, plan_id, before_state, after_state |
-| `operational_approval_decisions` | Approval/rejection records | plan_id, reviewer_id, decision |
 | `immutable_audit_logs` | Compliance audit trail | event_id, operation_type, intent_payload, before_state, after_state |
 
 ### Finance Tables
@@ -306,35 +304,35 @@ backend/app/services/
 
 ### Key Service Responsibilities
 
-**1. GeminiPoolClient (`gemini_pool_service.py`)**
+**1. GeminiClient (`gemini_pool_service.py`)**
 ```python
-# Primary LLM interface for all AI features
-class GeminiPoolClient:
-    @staticmethod
-    async def generate_json(module, prompt, timeout=25.0) -> dict:
+# Single Gemini API client for all AI features
+class GeminiClient:
+    @classmethod
+    async def ask_json(cls, prompt, system_instruction) -> dict:
         # For structured output (NLP parsing)
-        # Tries OpenRouter first, falls back to Gemini
+        # Uses google.generativeai SDK with JSON mode
         
-    @staticmethod
-    async def generate_text(module, system_prompt, user_message, temperature=0.4) -> str:
+    @classmethod
+    async def ask(cls, prompt, system_instruction, temperature=0.4) -> str:
         # For conversational output (chatbot)
         # Temperature 0.4 balances creativity vs accuracy
 ```
 
 **2. Conversational Ops Service (`conversational_ops_service.py`)**
 ```python
-# Command Console pipeline
-async def create_operational_plan(db, user, message, module):
+# Command Console pipeline — direct execution, no approval gates
+async def create_and_execute(db, user, message, module):
     # 1. _extract_intent() → LLM parsing
-    # 2. _clarification_needed() → Ambiguity check
+    # 2. Confidence check → clarification if too low
     # 3. _permission_gate() → Role + department check
     # 4. _estimate_impact() → COUNT affected rows
     # 5. _classify_risk() → LOW/MEDIUM/HIGH
-    # 6. _build_preview() → Show affected records
-    # 7. Save plan + auto-execute if LOW risk READ
+    # 6. Execute directly → Capture before/after state
+    # 7. _audit() → Immutable audit log
 
-async def execute_operational_plan(db, user, plan_id):
-    # Capture before_state → Execute SQL → Capture after_state → Audit
+async def rollback_execution(db, user, execution_id):
+    # Restore before_state → Update records → Audit
 ```
 
 **3. NLP CRUD Service (`nlp_crud_service.py`)**
@@ -467,30 +465,15 @@ export function AuthProvider({ children }) {
 
 ### LLM Integration
 
-**Provider Hierarchy:**
-1. **OpenRouter** (Primary) — `OPENROUTER_API_KEY`
-2. **Google Gemini** (Fallback) — `GOOGLE_API_KEY`
+**Provider:**
+- **Google Gemini** — `GEMINI_API_KEY`
 
 **Model Configuration:**
 ```python
-# Primary: OpenRouter
-OPENROUTER_MODEL = "liquid/lfm-2.5-1.2b-thinking:free"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-
-# Fallback: Gemini
-GOOGLE_MODEL = "gemini-2.0-flash"
-GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-```
-
-**Module-Specific Key Pools (Gemini):**
-```python
-GEMINI_KEY_POOLS = {
-    "nlp": [...],           # NLP parsing, Command Console
-    "chat": [...],          # Chatbot conversations
-    "predictions": [...],   # ML model explanations
-    "finance": [...],       # Finance module
-    "hr": [...],            # HR/payroll module
-}
+# Google Gemini (single key)
+GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_TEMPERATURE_JSON = 0.1    # For structured output
+GEMINI_TEMPERATURE_CHAT = 0.4    # For conversational output
 ```
 
 ### Grade Prediction Pipeline
@@ -619,11 +602,10 @@ department = re.search(r'(?:in|from)\s+([A-Z][a-z]+)\s+department', msg)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/ops-ai/plan` | Create operation plan from NL |
-| `POST` | `/api/ops-ai/execute` | Execute approved plan |
-| `POST` | `/api/ops-ai/decide` | Approve/reject plan |
-| `GET` | `/api/ops-ai/pending` | Get pending approvals |
+| `POST` | `/api/ops-ai/execute` | Execute operation from natural language |
 | `POST` | `/api/ops-ai/rollback` | Rollback execution |
+| `GET` | `/api/ops-ai/history` | Get audit history |
+| `GET` | `/api/ops-ai/stats` | Get operation stats |
 
 ### Chatbot
 
@@ -741,10 +723,8 @@ cd project-expo
 # 2. Create environment file
 cat > backend/.env << EOF
 DATABASE_URL=postgresql+asyncpg://campusiq:campusiq_secret@db:5432/campusiq
-REDIS_URL=redis://redis:6379/0
 SECRET_KEY=your-secret-key
-OPENROUTER_API_KEY=your-openrouter-key
-OPENROUTER_MODEL=liquid/lfm-2.5-1.2b-thinking:free
+GEMINI_API_KEY=your-gemini-api-key
 EOF
 
 # 3. Start all services
@@ -775,14 +755,11 @@ docker logs campusiq-backend -f
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://...` |
-| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
 | `SECRET_KEY` | JWT signing key | (required) |
-| `OPENROUTER_API_KEY` | OpenRouter LLM API key | (required for AI) |
-| `OPENROUTER_MODEL` | LLM model name | `liquid/lfm-2.5-1.2b-thinking:free` |
-| `GOOGLE_API_KEY` | Gemini fallback key | (optional) |
-| `OPS_CONFIDENCE_THRESHOLD` | Min confidence for auto-execute | `0.75` |
-| `OPS_REQUIRE_2FA_HIGH_RISK` | Require 2FA for HIGH risk | `true` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT expiration | `60` |
+| `GEMINI_API_KEY` | Google Gemini API key | (required for AI) |
+| `GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash` |
+| `OPS_CONFIDENCE_THRESHOLD` | Min confidence for execution | `0.75` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT expiration | `480` |
 
 ### Frontend Environment Variables
 
@@ -872,7 +849,7 @@ project-expo/
 
 | Issue | Solution |
 |-------|----------|
-| "No LLM keys configured" | Add `OPENROUTER_API_KEY` to `backend/.env` |
+| "No LLM keys configured" | Add `GEMINI_API_KEY` to `backend/.env` |
 | "JWT expired" | Login again to get new token |
 | "Permission denied" | Check user role matches required access |
 | "Database connection failed" | Ensure PostgreSQL container is running |

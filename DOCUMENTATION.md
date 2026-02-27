@@ -1,7 +1,7 @@
 # CampusIQ — Complete Technical Documentation
 
 > **AI-First Intelligent College ERP System**  
-> Built with FastAPI, React, PostgreSQL, Redis, and OpenRouter LLM
+> Built with FastAPI, React, PostgreSQL, and Google Gemini LLM
 
 ---
 
@@ -43,7 +43,7 @@
 │  • Auth Service (JWT)                                           │
 │  • NLP CRUD Service (Natural Language → SQL)                    │
 │  • Prediction Service (XGBoost + SHAP)                          │
-│  • Chatbot Service (OpenRouter LLM)                             │
+│  • Chatbot Service (Gemini LLM)                             │
 │  • Conversational Ops Service (Command Console)                 │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -61,7 +61,7 @@
 1. **Backend First** — FastAPI app with async SQLAlchemy for high concurrency
 2. **Database Design** — PostgreSQL with proper relationships and indexes
 3. **ML Pipeline** — XGBoost trained on synthetic academic data
-4. **LLM Integration** — OpenRouter API for NLP parsing and chatbot
+4. **LLM Integration** — Google Gemini API for NLP parsing and chatbot
 5. **Frontend** — React SPA with role-based routing
 6. **Containerization** — Docker Compose for easy deployment
 
@@ -445,7 +445,7 @@ ORDER BY student_count DESC;
 
 ### Overview
 
-The **Command Console** is the flagship feature — a conversational operations AI that converts natural language into safe database operations with human approval.
+The **Command Console** is the flagship feature — a conversational operations AI that converts natural language into safe database operations with full audit logging.
 
 ### Architecture
 
@@ -458,31 +458,19 @@ The **Command Console** is the flagship feature — a conversational operations 
 │       │                                                         │
 │       ▼                                                         │
 │  ┌─────────────────┐                                           │
-│  │  NLP Parser     │  OpenRouter LLM extracts:                 │
-│  │  (LLM)          │  • intent: READ                           │
+│  │  NLP Parser     │  GeminiClient.ask_json() extracts:                 │
+│  │  (Gemini LLM)   │  • intent: READ                           │
 │  └────────┬────────┘  • entity: student                        │
 │           │           • filters: {department: "CSE", cgpa_lt: 6}│
 │           ▼                                                     │
 │  ┌─────────────────┐                                           │
 │  │  Risk Assessor  │  Calculates:                              │
 │  │                 │  • risk_level: LOW/MEDIUM/HIGH            │
-│  └────────┬────────┘  • requires_approval: true/false          │
-│           │                                                     │
-│           ▼                                                     │
-│  ┌─────────────────┐                                           │
-│  │  Plan Generator │  Creates:                                 │
-│  │                 │  • preview of affected records            │
-│  └────────┬────────┘  • rollback strategy                      │
-│           │                                                     │
-│           ▼                                                     │
-│  ┌─────────────────┐  If HIGH risk:                            │
-│  │  Approval Gate  │  → Requires senior approval               │
-│  │                 │  → Requires 2FA verification              │
 │  └────────┬────────┘                                           │
 │           │                                                     │
 │           ▼                                                     │
 │  ┌─────────────────┐                                           │
-│  │  Executor       │  Applies changes with:                    │
+│  │  Executor       │  Executes directly with:                  │
 │  │                 │  • before_state snapshot                  │
 │  └────────┬────────┘  • after_state snapshot                   │
 │           │           • audit log entry                         │
@@ -514,14 +502,14 @@ Input: "Average CGPA by semester"
 Input: "Attendance distribution by course"
 ```
 
-**3. UPDATE Operations (Requires Confirmation)**
+**3. UPDATE Operations (Executed Directly)**
 
 ```
 Input: "Update semester to 4 for all students in section A"
 Input: "Change CGPA to 7.5 for student with roll number CSE2023015"
 ```
 
-**4. DELETE Operations (HIGH Risk, Requires Senior Approval)**
+**4. DELETE Operations (HIGH Risk, Executed with Audit)**
 
 ```
 Input: "Delete all inactive users"
@@ -530,9 +518,9 @@ Input: "Remove student with ID 25"
 
 ### API Requests
 
-**Create Plan:**
+**Execute Command:**
 ```json
-POST /api/ops-ai/plan
+POST /api/ops-ai/execute
 Authorization: Bearer <token>
 
 {
@@ -550,42 +538,23 @@ Authorization: Bearer <token>
   "confidence": 0.95,
   "risk_level": "LOW",
   "estimated_impact_count": 12,
-  "requires_confirmation": false,
-  "requires_senior_approval": false,
-  "status": "ready_for_execution",
-  "preview": {
-    "affected_records": [
-      {"id": 5, "roll_number": "CSE2023005", "cgpa": 5.8, "name": "..."},
-      {"id": 12, "roll_number": "CSE2023012", "cgpa": 5.2, "name": "..."}
-    ],
-    "proposed_changes": [],
-    "rollback_plan": {
-      "strategy": "before_state_snapshot",
-      "supports_rollback": true
-    }
-  }
+  "status": "executed",
+  "summary": "Found 12 CSE students with CGPA below 6.0",
+  "before_state": [
+    {"id": 5, "roll_number": "CSE2023005", "cgpa": 5.8},
+    {"id": 12, "roll_number": "CSE2023012", "cgpa": 5.2}
+  ],
+  "after_state": []
 }
 ```
 
-**Execute Plan:**
+**Rollback an Execution:**
 ```json
-POST /api/ops-ai/execute
+POST /api/ops-ai/rollback
 Authorization: Bearer <token>
 
 {
-  "plan_id": "ops_abc123def456"
-}
-```
-
-**Approve High-Risk Plan (Senior Admin):**
-```json
-POST /api/ops-ai/decide
-Authorization: Bearer <admin_token>
-
-{
-  "plan_id": "ops_xyz789",
-  "decision": "APPROVE",
-  "two_factor_code": "123456"
+  "execution_id": "exec_xyz789"
 }
 ```
 
@@ -594,7 +563,7 @@ Authorization: Bearer <admin_token>
 **File:** `backend/app/services/conversational_ops_service.py`
 
 ```python
-async def create_operational_plan(
+async def create_and_execute(
     *,
     db: AsyncSession,
     user: User,
@@ -603,138 +572,51 @@ async def create_operational_plan(
 ) -> dict:
     """
     Main entry point for Command Console.
+    Parses natural language and executes directly.
     
     Steps:
-    1. Parse natural language using LLM
+    1. Parse natural language using LLM (GeminiClient.ask_json)
     2. Validate user permissions
     3. Calculate risk level
-    4. Generate preview of affected records
-    5. Create plan record in database
-    6. Auto-execute if LOW risk READ/ANALYZE
-    7. Return plan details to frontend
+    4. Capture before_state snapshot
+    5. Execute the operation
+    6. Capture after_state snapshot
+    7. Create audit log entry
+    8. Return execution result
     """
     
     # Step 1: Parse with LLM
-    parsed = await _parse_intent_with_llm(message)
+    parsed = await _extract_intent(message)
     # Returns: {intent, entity, filters, values, confidence}
     
     # Step 2: Permission check
-    allowed, reason = _check_permission(user.role, parsed["intent"], parsed["entity"])
+    allowed, reason = _permission_gate(user.role, parsed["intent"], parsed["entity"])
     
     # Step 3: Risk assessment
-    risk = _calculate_risk(
+    risk = _classify_risk(
         intent=parsed["intent"],
         entity=parsed["entity"],
         impact_count=len(affected_rows)
     )
     
-    # Step 4: Build preview
-    preview = await _build_preview(db, parsed["entity"], parsed["filters"], parsed["values"])
-    
-    # Step 5: Determine requirements
-    requires_confirmation = parsed["intent"] in {"UPDATE", "CREATE"}
-    requires_senior_approval = risk == "HIGH" or parsed["intent"] == "DELETE"
-    requires_2fa = risk == "HIGH" and settings.OPS_REQUIRE_2FA_HIGH_RISK
-    
-    # Step 6: Create plan record
-    plan = OperationalPlan(
-        plan_id=f"ops_{uuid.uuid4().hex[:12]}",
-        user_id=user.id,
-        message=message,
-        intent_type=parsed["intent"],
-        entity=parsed["entity"],
-        filters=parsed["filters"],
-        values=parsed["values"],
-        confidence=parsed["confidence"],
-        risk_level=risk,
-        status="ready_for_execution" if risk == "LOW" else "awaiting_approval",
-        preview=preview,
-        ...
-    )
-    db.add(plan)
-    await db.flush()
-    
-    # Step 7: Auto-execute safe operations
-    if plan.status == "ready_for_execution":
-        result = await execute_operational_plan(db=db, user=user, plan_id=plan.plan_id)
-        return {**plan_data, "auto_execution": result}
-    
-    return plan_data
-
-
-def _calculate_risk(intent: str, entity: str, impact_count: int) -> str:
-    """
-    Risk calculation logic:
-    
-    HIGH risk if:
-    - DELETE operation
-    - Affects > 50 records
-    - Modifying users/permissions
-    
-    MEDIUM risk if:
-    - UPDATE/CREATE operation
-    - Affects 10-50 records
-    
-    LOW risk if:
-    - READ/ANALYZE operation
-    - Affects < 10 records
-    """
-    if intent == "DELETE":
-        return "HIGH"
-    if entity == "user" and intent in {"UPDATE", "CREATE"}:
-        return "HIGH"
-    if impact_count > 50:
-        return "HIGH"
-    if impact_count > 25:
-        return "HIGH"
-    if intent in {"UPDATE", "CREATE"}:
-        return "MEDIUM"
-    return "LOW"
-
-
-async def execute_operational_plan(
-    *,
-    db: AsyncSession,
-    user: User,
-    plan_id: str
-) -> dict:
-    """
-    Execute an approved plan.
-    
-    Steps:
-    1. Load plan from database
-    2. Verify permissions and status
-    3. Capture before_state snapshot
-    4. Execute operation (SELECT/INSERT/UPDATE/DELETE)
-    5. Capture after_state snapshot
-    6. Create audit log entry
-    7. Return execution result
-    """
-    plan = await db.get(OperationalPlan, plan_id)
-    
-    # Capture before state
-    rows = await _rows_for_execution(db, plan)
+    # Step 4: Execute operation
     before_state = [_model_to_dict(row) for row in rows]
     
-    # Execute based on intent
-    if plan.intent_type == "READ":
-        # Just return the data
+    if parsed["intent"] == "READ":
         after_state = before_state
-        
-    elif plan.intent_type == "UPDATE":
+    elif parsed["intent"] == "UPDATE":
         for row in rows:
-            for key, value in plan.values.items():
+            for key, value in parsed["values"].items():
                 setattr(row, key, value)
         await db.flush()
         after_state = [_model_to_dict(row) for row in rows]
-        
-    elif plan.intent_type == "DELETE":
+    elif parsed["intent"] == "DELETE":
         for row in rows:
             await db.delete(row)
         await db.flush()
         after_state = []
     
-    # Create audit log
+    # Step 5: Create audit log
     await _audit(db, user_id=user.id, role=user.role.value, ...)
     
     return {
@@ -742,7 +624,8 @@ async def execute_operational_plan(
         "status": "executed",
         "affected_count": len(before_state),
         "before_state": before_state,
-        "after_state": after_state
+        "after_state": after_state,
+        "summary": f"Found {len(before_state)} records"
     }
 ```
 
@@ -776,7 +659,7 @@ User message: "{message}"
 
 Return ONLY valid JSON."""
 
-    result = await GeminiPoolClient.generate_json(module="nlp", prompt=prompt)
+    result = await GeminiClient.ask_json(prompt)
     return json.loads(result["text"])
 
 
@@ -839,7 +722,7 @@ Context-aware AI assistant that answers questions using live database data.
 │           ▼                                                  │
 │  ┌─────────────────┐                                        │
 │  │ LLM Generator   │  System prompt + context + question    │
-│  │ (OpenRouter)    │                                        │
+│  │ (Gemini)        │                                        │
 │  └────────┬────────┘                                        │
 │           │                                                  │
 │           ▼                                                  │
@@ -920,11 +803,8 @@ Current user context:
 Answer questions helpfully using the context above. Be specific with numbers and data.
 If asked about something not in context, say you don't have that information."""
 
-    response = await GeminiPoolClient.generate_text(
-        module="chat",
-        system_prompt=system_prompt,
-        user_message=message,
-        temperature=0.4
+    response = await GeminiClient.ask(
+        prompt=system_prompt + "\n\nUser: " + message
     )
     
     return {"response": response, "data_query": False, "context_used": True}
@@ -1428,11 +1308,10 @@ class ImmutableAuditLog(Base):
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/ops-ai/plan` | Create operation plan from NL |
-| POST | `/api/ops-ai/execute` | Execute approved plan |
-| POST | `/api/ops-ai/decide` | Approve/reject plan |
-| GET | `/api/ops-ai/pending` | Get pending approvals |
+| POST | `/api/ops-ai/execute` | Execute operation from natural language |
 | POST | `/api/ops-ai/rollback` | Rollback execution |
+| GET | `/api/ops-ai/history` | Get audit history |
+| GET | `/api/ops-ai/stats` | Get operation statistics |
 
 ### Chatbot
 
@@ -1453,16 +1332,15 @@ class ImmutableAuditLog(Base):
 | `nlp_crud_service` | `detect_intent_llm()` | Parse NL with LLM |
 | `nlp_crud_service` | `detect_intent_keyword()` | Fallback NL parser |
 | `nlp_crud_service` | `process_nlp_crud()` | Execute NL query |
-| `conversational_ops_service` | `create_operational_plan()` | Create Command Console plan |
-| `conversational_ops_service` | `execute_operational_plan()` | Execute approved plan |
+| `conversational_ops_service` | `create_and_execute()` | Parse NL and execute directly |
 | `conversational_ops_service` | `rollback_execution()` | Undo execution |
 | `chatbot_service` | `process_chat_message()` | Handle chat |
 | `chatbot_service` | `_build_user_context()` | Fetch user data for LLM |
 | `prediction_service` | `get_student_predictions()` | Generate ML predictions |
 | `attendance_service` | `generate_qr_attendance()` | Create QR code |
 | `attendance_service` | `mark_attendance_by_qr()` | Process QR scan |
-| `gemini_pool_service` | `generate_json()` | LLM call for JSON output |
-| `gemini_pool_service` | `generate_text()` | LLM call for text output |
+| `gemini_pool_service` | `GeminiClient.ask_json()` | LLM call for JSON output |
+| `gemini_pool_service` | `GeminiClient.ask()` | LLM call for text output |
 
 ### Utility Functions
 
@@ -1508,10 +1386,9 @@ docker compose down
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://...` |
 | `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
 | `SECRET_KEY` | JWT signing key | (required) |
-| `OPENROUTER_API_KEY` | OpenRouter LLM API key | (required for AI features) |
-| `OPENROUTER_MODEL` | LLM model name | `liquid/lfm-2.5-1.2b-thinking:free` |
+| `GEMINI_API_KEY` | Google Gemini API key | (required for AI features) |
+| `GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash` |
 | `OPS_CONFIDENCE_THRESHOLD` | Min confidence for auto-execute | `0.75` |
-| `OPS_REQUIRE_2FA_HIGH_RISK` | Require 2FA for HIGH risk ops | `true` |
 
 ---
 
@@ -1521,7 +1398,7 @@ docker compose down
 
 | Issue | Solution |
 |-------|----------|
-| "No LLM keys configured" | Add `OPENROUTER_API_KEY` to `.env` |
+| "No LLM keys configured" | Add `GEMINI_API_KEY` to `.env` |
 | "JWT expired" | Login again to get new token |
 | "Permission denied" | Check user role matches required access |
 | "Database connection failed" | Ensure PostgreSQL container is running |

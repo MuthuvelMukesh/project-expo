@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, Check, CheckCheck, X } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function NotificationBell() {
+    const { user } = useAuth();
     const [open, setOpen] = useState(false);
     const [notifs, setNotifs] = useState([]);
     const [unread, setUnread] = useState(0);
@@ -18,7 +20,12 @@ export default function NotificationBell() {
         } catch (e) { /* silent */ }
     };
 
-    useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+    useEffect(() => {
+        if (!user) return;
+        load();
+        const t = setInterval(load, 30000);
+        return () => clearInterval(t);
+    }, [user]);
     useEffect(() => {
         const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
         document.addEventListener('mousedown', handler);

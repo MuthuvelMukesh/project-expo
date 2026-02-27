@@ -409,7 +409,7 @@ class OperationalPlan(Base):
     module = Column(String(30), nullable=False, default="nlp")
     message = Column(Text, nullable=False)
 
-    intent_type = Column(String(20), nullable=False)  # READ, CREATE, UPDATE, DELETE, ANALYZE, ESCALATE
+    intent_type = Column(String(20), nullable=False)  # READ, CREATE, UPDATE, DELETE, ANALYZE
     entity = Column(String(50), nullable=False)
     filters = Column(JSON, default=dict)
     scope = Column(JSON, default=dict)

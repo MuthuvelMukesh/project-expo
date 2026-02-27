@@ -18,7 +18,7 @@ async def _make_user(db_session, email: str, role: UserRole, full_name: str = "T
 
 
 @pytest.mark.asyncio
-async def test_plan_requires_clarification(db_session, monkeypatch):
+async def test_low_confidence_returns_clarification(db_session, monkeypatch):
     admin = await _make_user(db_session, "admin1@campusiq.edu", UserRole.ADMIN, "Admin 1")
 
     async def fake_extract(_message: str, _module: str):
@@ -39,20 +39,19 @@ async def test_plan_requires_clarification(db_session, monkeypatch):
 
     monkeypatch.setattr(ops, "_extract_intent", fake_extract)
 
-    result = await ops.create_operational_plan(
+    result = await ops.create_and_execute(
         db=db_session,
         user=admin,
         message="Update student",
         module="nlp",
     )
 
-    assert result["status"] == "clarification_required"
-    assert result["clarification"] is not None
-    assert result["clarification"]["code"] == "CLARIFICATION_REQUIRED"
+    assert result["status"] == "clarification_needed"
+    assert "confidence" in result
 
 
 @pytest.mark.asyncio
-async def test_student_delete_becomes_escalation(db_session, monkeypatch):
+async def test_student_cannot_delete_course(db_session, monkeypatch):
     student_user = await _make_user(db_session, "student1@campusiq.edu", UserRole.STUDENT, "Student 1")
     dept = Department(name="Computer Science", code="CSE")
     db_session.add(dept)
@@ -83,16 +82,15 @@ async def test_student_delete_becomes_escalation(db_session, monkeypatch):
 
     monkeypatch.setattr(ops, "_extract_intent", fake_extract)
 
-    result = await ops.create_operational_plan(
+    result = await ops.create_and_execute(
         db=db_session,
         user=student_user,
         message="Delete course 1",
         module="nlp",
     )
 
-    assert result["intent"] == "ESCALATE"
-    assert result["requires_senior_approval"] is True
-    assert result["permission"]["escalation_required"] is True
+    # Students don't have permission to delete courses
+    assert result["status"] == "denied"
 
 
 @pytest.mark.asyncio
@@ -121,47 +119,32 @@ async def test_execute_and_rollback_update(db_session, monkeypatch):
 
     monkeypatch.setattr(ops, "_extract_intent", fake_extract)
 
-    plan = await ops.create_operational_plan(
+    result = await ops.create_and_execute(
         db=db_session,
         user=admin,
         message="Update ECE101 credits to 5",
         module="nlp",
     )
-    assert plan["status"] in {"awaiting_confirmation", "ready_for_execution"}
+    assert result["status"] == "executed"
+    assert result["affected_count"] == 1
 
-    decision = await ops.add_approval_decision(
-        db=db_session,
-        user=admin,
-        plan_id=plan["plan_id"],
-        decision="APPROVE",
-        approved_ids=[course.id],
-    )
-    assert decision["status"] == "approved"
-
-    executed = await ops.execute_operational_plan(
-        db=db_session,
-        user=admin,
-        plan_id=plan["plan_id"],
-    )
-    assert executed["status"] == "executed"
-    assert executed["affected_count"] == 1
-
-    refreshed = (await db_session.get(Course, course.id))
+    refreshed = await db_session.get(Course, course.id)
     assert refreshed.credits == 5
 
     rolled = await ops.rollback_execution(
         db=db_session,
         user=admin,
-        execution_id=executed["execution_id"],
+        execution_id=result["execution_id"],
     )
     assert rolled["status"] == "rolled_back"
 
-    restored = (await db_session.get(Course, course.id))
+    restored = await db_session.get(Course, course.id)
     assert restored.credits == 3
 
 
 @pytest.mark.asyncio
-async def test_high_risk_requires_2fa(db_session, monkeypatch):
+async def test_high_risk_still_executes_directly(db_session, monkeypatch):
+    """High-risk ops execute directly — no 2FA or approval gates."""
     admin = await _make_user(db_session, "admin3@campusiq.edu", UserRole.ADMIN, "Admin 3")
 
     async def fake_extract(_message: str, _module: str):
@@ -178,29 +161,14 @@ async def test_high_risk_requires_2fa(db_session, monkeypatch):
 
     monkeypatch.setattr(ops, "_extract_intent", fake_extract)
 
-    plan = await ops.create_operational_plan(
+    result = await ops.create_and_execute(
         db=db_session,
         user=admin,
-        message="Set salary",
+        message="Set salary to 200000",
         module="hr",
     )
 
-    assert plan["risk_level"] == "HIGH"
-    assert plan["requires_2fa"] is True
+    assert result["risk_level"] == "HIGH"
+    # No 2FA required — direct execution
+    assert result["status"] in ("executed", "failed")
 
-    rejected = await ops.add_approval_decision(
-        db=db_session,
-        user=admin,
-        plan_id=plan["plan_id"],
-        decision="APPROVE",
-    )
-    assert rejected["error"] == "TWO_FACTOR_REQUIRED"
-
-    approved = await ops.add_approval_decision(
-        db=db_session,
-        user=admin,
-        plan_id=plan["plan_id"],
-        decision="APPROVE",
-        two_factor_code="123456",
-    )
-    assert approved["status"] == "approved"

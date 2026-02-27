@@ -27,7 +27,7 @@ docker-compose up -d
 All required packages installed:
 - fastapi, uvicorn, pydantic, sqlalchemy
 - scikit-learn, xgboost, pandas, numpy
-- langchain, celery, redis, httpx
+- google-generativeai, httpx
 - pytest, alembic, asyncpg
 
 **Note**: Used flexible version constraints (`>=`) to avoid compilation issues
@@ -63,9 +63,8 @@ Then access at **http://localhost:8000** (backend serves static files)
 ### Environment Variables (.env)
 ```
 DATABASE_URL=postgresql+asyncpg://campusiq:campusiq_secret@127.0.0.1:5433/campusiq
-REDIS_URL=redis://localhost:6379/0
-GOOGLE_API_KEY=AIzaSyBc_1isBU9KIM3CXcj1MLiu84jZuuKmb2w
-GOOGLE_MODEL=gemini-2.5-flash
+GEMINI_API_KEY=AIzaSyBc_1isBU9KIM3CXcj1MLiu84jZuuKmb2w
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ### Database Connection

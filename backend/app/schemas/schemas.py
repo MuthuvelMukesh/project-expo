@@ -367,70 +367,30 @@ class CourseDetail(BaseModel):
 
 # ─── Conversational Operational AI ─────────────────────────────
 
-class OperationalPlanRequest(BaseModel):
+
+class ConversationalRequest(BaseModel):
+    """Single request for the conversational ops endpoint."""
     message: str
     module: str = "nlp"
-    clarification: Optional[str] = None
 
 
-class ClarificationPayload(BaseModel):
-    code: str
+class ConversationalResponse(BaseModel):
+    """Direct execution response — no approval gates."""
+    status: str  # executed, denied, clarification_needed, validation_error, failed
     message: str
-    unclear_parts: List[str]
-    question: str
-    confidence: float
-    threshold: float
-
-
-class OperationalPlanResponse(BaseModel):
-    plan_id: str
-    intent: str
-    entity: str
-    confidence: float
-    risk_level: str
-    estimated_impact_count: int
-    requires_confirmation: bool
-    requires_senior_approval: bool
-    requires_2fa: bool
-    status: str
-    clarification: Optional[ClarificationPayload] = None
-    preview: dict
-    auto_execution: Optional[dict] = None
-    ai_service: Optional[dict] = None
-    permission: dict
-
-
-class OperationalDecisionRequest(BaseModel):
-    plan_id: str
-    decision: str  # APPROVE, REJECT, ESCALATE
-    approved_ids: Optional[List[int]] = None
-    rejected_ids: Optional[List[int]] = None
-    comment: Optional[str] = None
-    two_factor_code: Optional[str] = None
-
-
-class OperationalDecisionResponse(BaseModel):
-    plan_id: str
-    status: str
-    decision: str
-    two_factor_verified: bool
-    approved_ids: List[int] = []
-    rejected_ids: List[int] = []
-
-
-class OperationalExecuteRequest(BaseModel):
-    plan_id: str
-
-
-class OperationalExecuteResponse(BaseModel):
-    plan_id: str
-    execution_id: str
-    status: str
+    plan_id: Optional[str] = None
+    execution_id: Optional[str] = None
+    intent: Optional[str] = None
+    entity: Optional[str] = None
+    risk_level: Optional[str] = None
     affected_count: Optional[int] = None
     before_state: Optional[List[dict]] = None
     after_state: Optional[List[dict]] = None
+    analysis: Optional[dict] = None
+    confidence: Optional[float] = None
+    parsed: Optional[dict] = None
+    errors: Optional[List[str]] = None
     error: Optional[str] = None
-    alert: Optional[str] = None
 
 
 class OperationalRollbackRequest(BaseModel):
@@ -441,6 +401,7 @@ class OperationalRollbackResponse(BaseModel):
     execution_id: str
     plan_id: Optional[str] = None
     status: str
+    message: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -461,20 +422,6 @@ class AuditHistoryItem(BaseModel):
     created_at: Optional[str] = None
 
 
-class PendingApprovalItem(BaseModel):
-    plan_id: str
-    user_id: int
-    requester_name: str
-    module: str
-    message: str
-    intent_type: str
-    entity: str
-    risk_level: str
-    estimated_impact_count: int
-    requires_2fa: bool
-    created_at: Optional[str] = None
-
-
 class OpsModuleStat(BaseModel):
     module: str
     total: int
@@ -490,9 +437,9 @@ class OpsRiskStat(BaseModel):
 
 class OpsStatsResponse(BaseModel):
     total_plans: int
-    awaiting_approval: int
     executed_today: int
     failed_total: int
+    rolled_back_total: int
     by_risk: List[OpsRiskStat]
     by_module: List[OpsModuleStat]
 

@@ -19,9 +19,7 @@ CampusIQ uses Google's Gemini API for all AI-powered features. Follow these step
 - ✅ **1 million tokens per minute**
 - ✅ **Unlimited** for development use
 
-For production deployments with higher traffic, consider:
-- Using multiple API keys (key pooling)
-- Upgrading to paid tier (if available)
+For production deployments with higher traffic, consider upgrading to a paid tier.
 
 ---
 
@@ -31,27 +29,19 @@ For production deployments with higher traffic, consider:
 
 1. **Navigate to the project root** directory:
    ```bash
-   cd d:\project expo\project-expo
+   cd /path/to/project-expo
    ```
 
 2. **Open or create `.env` file**:
    ```bash
-   notepad .env
+   nano .env
    ```
 
 3. **Add your API key**:
    ```env
-   # Required: Main Gemini API Key
-   GOOGLE_API_KEY=AIzaSy_YOUR_API_KEY_HERE
-   GOOGLE_BASE_URL=https://generativelanguage.googleapis.com/v1beta
-   GOOGLE_MODEL=gemini-1.5-flash
-   
-   # Optional: Module-specific key pools (for high-traffic production)
-   GEMINI_NLP_KEYS=
-   GEMINI_PREDICTIONS_KEYS=
-   GEMINI_FINANCE_KEYS=
-   GEMINI_HR_KEYS=
-   GEMINI_CHAT_KEYS=
+   # Required: Gemini API Key
+   GEMINI_API_KEY=AIzaSy_YOUR_API_KEY_HERE
+   GEMINI_MODEL=gemini-2.0-flash
    ```
 
 4. **Save and close** the file
@@ -62,15 +52,15 @@ If using Docker Compose, update `docker-compose.yml` or `docker-compose.producti
 
 ```yaml
 environment:
-  GOOGLE_API_KEY: "AIzaSy_YOUR_API_KEY_HERE"
-  GOOGLE_MODEL: "gemini-1.5-flash"
+  GEMINI_API_KEY: "AIzaSy_YOUR_API_KEY_HERE"
+  GEMINI_MODEL: "gemini-2.0-flash"
 ```
 
-### Option C: Using PowerShell (Temporary Session)
+### Option C: Using Shell Environment (Temporary Session)
 
 For quick testing:
-```powershell
-$env:GOOGLE_API_KEY = "AIzaSy_YOUR_API_KEY_HERE"
+```bash
+export GEMINI_API_KEY="AIzaSy_YOUR_API_KEY_HERE"
 cd backend
 uvicorn app.main:app --reload
 ```
@@ -110,51 +100,10 @@ uvicorn app.main:app --reload
 
 If you see errors, check the console logs:
 ```
-✅ Good: "Gemini chat pool response received"
-❌ Bad: "No Gemini keys configured for module 'chat'"
-❌ Bad: "Gemini chat pool error: RATE_LIMITED"
+✅ Good: "Gemini response received"
+❌ Bad: "GEMINI_API_KEY not set"
+❌ Bad: "Gemini API error: RATE_LIMITED"
 ```
-
----
-
-## Advanced Configuration: Key Pooling
-
-For **production deployments** with high traffic, use module-specific key pools to distribute API calls across multiple keys.
-
-### Why Use Key Pools?
-
-- **Better rate limit management**: Each key has its own quota
-- **Automatic failover**: If one key is rate-limited, others are tried
-- **Module isolation**: Different features use different keys
-
-### How to Set Up Key Pools
-
-1. **Get multiple API keys** from Google AI Studio
-
-2. **Configure in `.env`**:
-   ```env
-   # Main fallback key
-   GOOGLE_API_KEY=AIzaSy_KEY_1_HERE
-   
-   # Module-specific pools (comma-separated)
-   GEMINI_NLP_KEYS=AIzaSy_KEY_2,AIzaSy_KEY_3,AIzaSy_KEY_4
-   GEMINI_PREDICTIONS_KEYS=AIzaSy_KEY_5,AIzaSy_KEY_6
-   GEMINI_FINANCE_KEYS=AIzaSy_KEY_7
-   GEMINI_HR_KEYS=AIzaSy_KEY_8
-   GEMINI_CHAT_KEYS=AIzaSy_KEY_9,AIzaSy_KEY_10
-   ```
-
-3. **Each module will rotate through its pool** when making API calls
-
-### Module Usage Guide
-
-| Module | Features | Recommended Keys |
-|--------|----------|------------------|
-| **NLP** | Command Console, NLP CRUD | 2-3 keys |
-| **Chat** | Chatbot, AI Assistant | 2-3 keys |
-| **Predictions** | Grade predictions, ML insights | 1-2 keys |
-| **Finance** | Finance AI features | 1 key |
-| **HR** | HR & Payroll AI features | 1 key |
 
 ---
 
@@ -167,7 +116,7 @@ For **production deployments** with high traffic, use module-specific key pools 
 **Fix**:
 ```env
 # Add to .env
-GOOGLE_API_KEY=AIzaSy_YOUR_KEY_HERE
+GEMINI_API_KEY=AIzaSy_YOUR_KEY_HERE
 ```
 
 ### Error: "RATE_LIMITED"
@@ -176,12 +125,8 @@ GOOGLE_API_KEY=AIzaSy_YOUR_KEY_HERE
 
 **Solutions**:
 1. **Wait 60 seconds** for quota reset
-2. **Add more API keys** to the key pool
-3. **Reduce request frequency**
-4. **Increase GEMINI_RETRY_ETA_SECONDS** in .env:
-   ```env
-   GEMINI_RETRY_ETA_SECONDS=120
-   ```
+2. **Reduce request frequency**
+3. **Upgrade to paid tier** if available
 
 ### Error: "Invalid API key"
 
@@ -215,33 +160,31 @@ GOOGLE_API_KEY=AIzaSy_YOUR_KEY_HERE
 
 ## API Models Available
 
-CampusIQ is configured to use **Gemini 1.5 Flash** by default (fast and efficient).
+CampusIQ is configured to use **Gemini 2.0 Flash** by default (fast and efficient).
 
 ### Available Models
 
 | Model | Speed | Intelligence | Best For |
 |-------|-------|--------------|----------|
-| `gemini-1.5-flash` | ⚡⚡⚡ Fast | ⭐⭐ Good | **Default** - General use |
-| `gemini-1.5-pro` | ⚡⚡ Moderate | ⭐⭐⭐ Excellent | Complex reasoning |
-| `gemini-1.0-pro` | ⚡⚡ Moderate | ⭐⭐ Good | Legacy support |
+| `gemini-2.0-flash` | ⚡⚡⚡ Fast | ⭐⭐⭐ Excellent | **Default** - General use |
+| `gemini-2.5-flash` | ⚡⚡⚡ Fast | ⭐⭐⭐ Excellent | Latest thinking model |
 
 ### Change Model (if needed)
 
 In `.env`:
 ```env
-GOOGLE_MODEL=gemini-1.5-pro
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 ---
 
 ## Performance Optimizations Applied
 
-✅ **HTTP/2 Connection Pooling**: Reuses connections for faster API calls  
-✅ **Key Pool Rotation**: Distributes load across multiple keys  
-✅ **Automatic Retry Logic**: Retries with different keys on failure  
+✅ **Single Client Instance**: Reuses a single `GeminiClient` for all requests  
+✅ **Automatic Retry Logic**: Retries on transient failures  
 ✅ **Graceful Degradation**: Falls back to rule-based responses if API unavailable  
-✅ **Request Timeouts**: Optimized to 25s for JSON, 30s for text  
-✅ **Connection Limits**: Max 100 connections, 20 keepalive  
+✅ **Temperature Tuning**: Low (0.1) for JSON parsing, moderate (0.4) for chat  
+✅ **Model Configuration**: Configurable via `GEMINI_MODEL` env var  
 
 ---
 
@@ -255,7 +198,7 @@ The `.env` file is in `.gitignore` by default.
 
 For Docker, Kubernetes, or cloud deployments:
 ```bash
-docker run -e GOOGLE_API_KEY=your_key campusiq
+docker run -e GEMINI_API_KEY=your_key campusiq
 ```
 
 ### ✅ **Rotate keys periodically**
@@ -309,12 +252,12 @@ The application includes **rule-based fallbacks** for all AI features:
 
 ## Quick Reference Commands
 
-```powershell
+```bash
 # Check if API key is set
-$env:GOOGLE_API_KEY
+echo $GEMINI_API_KEY
 
 # Test the application with your key
-.\start_production.ps1
+./start_production.sh
 
 # View logs for API issues
 cd backend

@@ -37,13 +37,10 @@ Still in Google AI Studio:
 
 1. **Click "Create API Key"**
 2. **Copy the new key**
-3. **Create 2-3 more keys** for key pooling (recommended)
 
 Example:
 ```
-Key 1: AIzaSy_NEW_KEY_1_HERE (use as primary)
-Key 2: AIzaSy_NEW_KEY_2_HERE (use in pools)
-Key 3: AIzaSy_NEW_KEY_3_HERE (use in pools)
+Key 1: AIzaSy_NEW_KEY_1_HERE (use as GEMINI_API_KEY)
 ```
 
 ---
@@ -58,12 +55,7 @@ notepad .env
 Replace placeholders:
 ```env
 # Use your NEW keys (not the old ones!)
-GOOGLE_API_KEY=AIzaSy_NEW_KEY_1_HERE
-
-# Optional: Distribute new keys across modules
-GEMINI_NLP_KEYS=AIzaSy_NEW_KEY_2_HERE,AIzaSy_NEW_KEY_3_HERE
-GEMINI_CHAT_KEYS=AIzaSy_NEW_KEY_2_HERE,AIzaSy_NEW_KEY_3_HERE
-GEMINI_PREDICTIONS_KEYS=AIzaSy_NEW_KEY_2_HERE
+GEMINI_API_KEY=AIzaSy_NEW_KEY_1_HERE
 ```
 
 **Save and close**.
@@ -141,8 +133,8 @@ In Google AI Studio, restrict keys by:
 ## 📋 Security Checklist
 
 - [ ] Old keys revoked at Google AI Studio
-- [ ] New keys generated (3 recommended)
-- [ ] `.env` file updated with NEW keys
+- [ ] New key generated
+- [ ] `.env` file updated with NEW key
 - [ ] Tested with `test_gemini_api.ps1`
 - [ ] Application started and working
 - [ ] Verified `.gitignore` includes `.env`

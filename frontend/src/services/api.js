@@ -6,9 +6,7 @@
 
 import {
     buildAuditQuery,
-    buildOperationalDecisionPayload,
-    buildOperationalExecutePayload,
-    buildOperationalPlanPayload,
+    buildConversationalPayload,
     buildOperationalRollbackPayload,
 } from './operationalAI.contract';
 
@@ -28,7 +26,12 @@ class ApiService {
         });
 
         if (response.status === 401) {
-            window.location.href = '/login';
+            // Don't redirect for auth-check calls or if already on login page
+            const isAuthCheck = endpoint === '/auth/me';
+            const isOnLogin = window.location.pathname === '/login';
+            if (!isAuthCheck && !isOnLogin) {
+                window.location.href = '/login';
+            }
             throw new Error('Session expired. Please login again.');
         }
 
@@ -145,40 +148,10 @@ class ApiService {
     }
 
     // ─── Operational AI (Conversational Ops) ────────────────
-    async operationalAIPlan(message, module = 'nlp', clarification = null) {
-        return this.request('/ops-ai/plan', {
-            method: 'POST',
-            body: JSON.stringify(buildOperationalPlanPayload(message, module, clarification)),
-        });
-    }
-
-    async operationalAIDecision({
-        planId,
-        decision,
-        approvedIds = [],
-        rejectedIds = [],
-        comment = null,
-        twoFactorCode = null,
-    }) {
-        return this.request('/ops-ai/decision', {
-            method: 'POST',
-            body: JSON.stringify(
-                buildOperationalDecisionPayload({
-                    planId,
-                    decision,
-                    approvedIds,
-                    rejectedIds,
-                    comment,
-                    twoFactorCode,
-                })
-            ),
-        });
-    }
-
-    async operationalAIExecute(planId) {
+    async operationalAIExecute(message, module = 'nlp') {
         return this.request('/ops-ai/execute', {
             method: 'POST',
-            body: JSON.stringify(buildOperationalExecutePayload(planId)),
+            body: JSON.stringify(buildConversationalPayload(message, module)),
         });
     }
 
@@ -191,11 +164,7 @@ class ApiService {
 
     async operationalAIAudit(filters = {}) {
         const q = buildAuditQuery(filters);
-        return this.request(`/ops-ai/audit${q ? `?${q}` : ''}`);
-    }
-
-    async getPendingApprovals() {
-        return this.request('/ops-ai/pending');
+        return this.request(`/ops-ai/history${q ? `?${q}` : ''}`);
     }
 
     async getOpsStats() {

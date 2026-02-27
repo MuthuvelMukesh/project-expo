@@ -14,7 +14,6 @@ Both frontend and backend are production-ready and combined into a single server
 
 ### Optional:
 - PostgreSQL 16 (or use Docker)
-- Redis (or use Docker)
 
 ---
 
@@ -35,21 +34,21 @@ CampusIQ uses Google's Gemini API for AI-powered features.
 
 ### Option A: Using .env File (Recommended)
 
-```powershell
+```bash
 # 1. Open .env file in project root
-notepad .env
+nano .env
 
 # 2. Add your API key (replace with your actual key)
-GOOGLE_API_KEY=AIzaSy_YOUR_API_KEY_HERE
+GEMINI_API_KEY=AIzaSy_YOUR_API_KEY_HERE
 
 # 3. Save and close
 ```
 
 ### Option B: Using Environment Variable
 
-```powershell
+```bash
 # Temporary for current session
-$env:GOOGLE_API_KEY = "AIzaSy_YOUR_API_KEY_HERE"
+export GEMINI_API_KEY="AIzaSy_YOUR_API_KEY_HERE"
 ```
 
 ---

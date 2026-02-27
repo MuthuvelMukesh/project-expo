@@ -13,14 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete, insert, and_, or_, cast, String
 from sqlalchemy.orm import selectinload
 
-from app.core.config import get_settings
+from app.core.config import settings
 from app.models.models import (
     User, UserRole, Department, Student, Faculty, Course, Attendance, Prediction
 )
-from app.services.gemini_pool_service import GeminiPoolClient, GeminiPoolError
+from app.services.gemini_pool_service import GeminiClient, GeminiError
 
-settings = get_settings()
-log = logging.getLogger("campusiq.nlp_crud")
+logger = logging.getLogger(__name__)
 
 # ─── Model Registry ─────────────────────────────────────────────
 # Maps natural language entity names to SQLAlchemy models + metadata
@@ -155,50 +154,79 @@ def _check_access(user_role: str, intent: str, entity: str) -> tuple[bool, str]:
 # ─── Intent Detection ────────────────────────────────────────────
 
 async def detect_intent_llm(message: str) -> Optional[dict]:
-    """Use Gemini to detect intent and extract structured info from a natural language message."""
-    prompt = f"""You are a database query classifier for a college ERP system.
-Tables: students, faculty, courses, departments, attendance, predictions, users.
+    """Parse natural language into structured intent using Gemini.
+    Falls back to keyword parser if Gemini fails."""
+    prompt = f"""You are a database query classifier for CampusIQ college ERP.
 
-Analyze the message and return JSON with:
-- "intent": "READ", "CREATE", "UPDATE", "DELETE", or "ANALYZE"
-- "entity": student, faculty, course, department, attendance, prediction, or user
-- "filters": object with filters. IMPORTANT FORMAT RULES:
-  - For CGPA comparisons: use "cgpa_lt" for less than, "cgpa_gt" for greater than (e.g. {{"cgpa_lt": 6.0}})
-  - For semester: use integer (e.g. {{"semester": 5}})
-  - For department: use exact name (e.g. {{"department": "Computer Science"}})
-  - NEVER use strings like "below 6.0" - always use numeric values with _lt or _gt suffix
-- "values": object for CREATE/UPDATE operations
-- "aggregation": "count", "average", "sum", "min", "max", "group_by", or null
-- "group_by": column name for grouping, or null
-- "limit": number or null
+Tables available: students, faculty, courses, departments,
+attendance, predictions, users, assignments, quiz_scores,
+lab_records, timetable, notifications, invoices, payments,
+employees, salary_structures, salary_records.
 
-Examples:
-- "students with cgpa below 6" -> {{"filters": {{"cgpa_lt": 6.0}}}}
-- "students with cgpa above 8.5" -> {{"filters": {{"cgpa_gt": 8.5}}}}
-- "count students in semester 5" -> {{"aggregation": "count", "filters": {{"semester": 5}}}}
+Return a JSON object with exactly these fields:
+{{
+  "intent": "READ" | "CREATE" | "UPDATE" | "DELETE" | "ANALYZE",
+  "entity": "student" | "faculty" | "course" | "department" |
+            "attendance" | "prediction" | "user" | "assignment" |
+            "timetable" | "invoice" | "payment" | "employee" | "salary",
+  "filters": {{
+    "department": null,
+    "semester": null,
+    "section": null,
+    "cgpa_lt": null,
+    "cgpa_gt": null,
+    "roll_number": null,
+    "id": null,
+    "is_active": null,
+    "risk_score_gt": null,
+    "course_id": null
+  }},
+  "values": {{}},
+  "aggregation": null,
+  "group_by_field": null,
+  "limit": null,
+  "order_by": null,
+  "order_dir": "desc",
+  "confidence": 0.95
+}}
+
+Rules:
+- Only populate filters that are explicitly mentioned
+- Use cgpa_lt for below/under/less than comparisons
+- Use cgpa_gt for above/over/greater than comparisons
+- aggregation: "count" | "average" | "sum" | "group_by" | null
+- confidence: how certain you are (0.0 to 1.0)
 
 User message: "{message}"
-
-Return ONLY valid JSON, no markdown, no explanation."""
+"""
 
     try:
-        result = await GeminiPoolClient.generate_json(module="nlp", prompt=prompt, timeout=20.0)
-        content = result.get("text", "")
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            parsed = json.loads(json_match.group())
-            # Sanitize filters
-            if "filters" in parsed and isinstance(parsed["filters"], dict):
-                parsed["filters"] = _sanitize_filters(parsed["filters"])
-            return parsed
-    except GeminiPoolError as e:
-        log.warning("Gemini NLP pool error in detect_intent_llm: %s (code=%s)", e.message, e.code)
-    except json.JSONDecodeError as e:
-        log.warning("Failed to parse Gemini JSON response for intent detection: %s", e)
-    except Exception as e:
-        log.error("Unexpected error in detect_intent_llm: %s", e, exc_info=True)
+        parsed = await GeminiClient.ask_json(prompt=prompt)
 
-    return None
+        if "intent" not in parsed or "entity" not in parsed:
+            logger.warning(f"Gemini NLP missing required fields: {parsed}")
+            return None
+
+        if not isinstance(parsed.get("filters"), dict):
+            parsed["filters"] = {}
+        if not isinstance(parsed.get("values"), dict):
+            parsed["values"] = {}
+
+        # Sanitize filters
+        parsed["filters"] = _sanitize_filters(parsed["filters"])
+
+        # Map group_by_field -> group_by for downstream compat
+        if parsed.get("group_by_field"):
+            parsed["group_by"] = parsed.pop("group_by_field")
+
+        return parsed
+
+    except (GeminiError, ValueError) as e:
+        logger.warning(f"Gemini NLP failed, using keyword fallback: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error in detect_intent_llm: {e}", exc_info=True)
+        return None
 
 
 def _sanitize_filters(filters: dict) -> dict:

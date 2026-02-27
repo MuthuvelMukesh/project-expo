@@ -1,6 +1,6 @@
 /**
  * Operational AI API contract helpers.
- * Keeps payload keys and endpoint mapping consistent with backend /api/ops-ai.
+ * Simplified: single execute endpoint, no approval gates.
  */
 
 export const OperationalAIModule = Object.freeze({
@@ -11,40 +11,8 @@ export const OperationalAIModule = Object.freeze({
     CHAT: 'chat',
 });
 
-export const OperationalDecision = Object.freeze({
-    APPROVE: 'APPROVE',
-    REJECT: 'REJECT',
-    ESCALATE: 'ESCALATE',
-});
-
-export function buildOperationalPlanPayload(message, module = OperationalAIModule.NLP, clarification = null) {
-    return {
-        message,
-        module,
-        clarification,
-    };
-}
-
-export function buildOperationalDecisionPayload({
-    planId,
-    decision,
-    approvedIds = [],
-    rejectedIds = [],
-    comment = null,
-    twoFactorCode = null,
-}) {
-    return {
-        plan_id: planId,
-        decision,
-        approved_ids: approvedIds,
-        rejected_ids: rejectedIds,
-        comment,
-        two_factor_code: twoFactorCode,
-    };
-}
-
-export function buildOperationalExecutePayload(planId) {
-    return { plan_id: planId };
+export function buildConversationalPayload(message, module = OperationalAIModule.NLP) {
+    return { message, module };
 }
 
 export function buildOperationalRollbackPayload(executionId) {

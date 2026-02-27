@@ -33,7 +33,7 @@
    notepad .env
    
    # Add your key:
-   GOOGLE_API_KEY=AIzaSy_YOUR_API_KEY_HERE
+   GEMINI_API_KEY=AIzaSy_YOUR_API_KEY_HERE
    ```
 
 3. **Test API connection** (optional but recommended):
@@ -60,14 +60,14 @@
 
 ## What is CampusIQ?
 
-CampusIQ is an **AI-first college ERP** that replaces form-driven campus management with intelligent, conversational automation. Users manage the entire system through natural language — the AI classifies intent, assesses risk, enforces approval, executes securely, and maintains a full audit trail.
+CampusIQ is an **AI-first college ERP** that replaces form-driven campus management with intelligent, conversational automation. Users manage the entire system through natural language — the AI classifies intent, assesses risk, executes directly, and maintains a full audit trail.
 
 ### Key Capabilities
 
 | Feature | Description |
 |---|---|
-| **Command Console** | NL → structured plan → risk review → human-in-the-loop approval → execution → rollback |
-| **Governance Dashboard** | Admin oversight: pending approvals, live stats, risk distribution, full audit trail |
+| **Command Console** | NL message → intent extraction → risk classification → direct execution → rollback |
+| **Governance Dashboard** | Admin oversight: live stats, risk distribution, full audit trail |
 | **Grade Prediction** | XGBoost predicts exam grades 4–6 weeks ahead with SHAP explainability |
 | **NLP CRUD Engine** | "Show all CSE students in semester 5" → instant database query |
 | **Context-Aware Chatbot** | Gemini-powered assistant injecting live attendance, CGPA, and predictions into context |
@@ -98,7 +98,7 @@ CampusIQ is an **AI-first college ERP** that replaces form-driven campus managem
               ↓
      ┌────────────────┐
      │  Gemini LLM    │
-     │   Key Pool     │
+     │  (Single Key)  │
      └────────────────┘
 ```
 
@@ -115,12 +115,12 @@ CampusIQ is an **AI-first college ERP** that replaces form-driven campus managem
 
 | Component | Engine | Fallback |
 |---|---|---|
-| **Command Console** | Gemini (`nlp` pool) — action planning + risk classification | Keyword-based planner |
-| **NLP CRUD Engine** | Gemini (`nlp` pool) — intent detection + entity extraction | Regex-based classifier |
-| **AI Chatbot** | Gemini (`chat` pool) — context-aware conversational Q&A | Rule-based knowledge base |
+| **Command Console** | Gemini (`gemini-2.0-flash`) — intent extraction + risk classification | Keyword-based planner |
+| **NLP CRUD Engine** | Gemini — intent detection + entity extraction | Regex-based classifier |
+| **AI Chatbot** | Gemini — context-aware conversational Q&A | Rule-based knowledge base |
 | **Prediction Engine** | XGBoost + SHAP (local model, no API needed) | — |
 
-All LLM calls route through `GeminiPoolClient` — a module-isolated key pool with automatic retry/failover across keys. If Gemini is unavailable, every AI feature gracefully falls back to keyword/rule-based logic so the ERP stays functional.
+All LLM calls route through `GeminiClient` — a single-key client with exponential backoff retry. If Gemini is unavailable, every AI feature gracefully falls back to keyword/rule-based logic so the ERP stays functional.
 
 ---
 
@@ -132,7 +132,7 @@ All LLM calls route through `GeminiPoolClient` — a module-isolated key pool wi
 | **Backend** | Python 3.11, FastAPI, SQLAlchemy 2.0 (async), Pydantic v2 |
 | **Database** | PostgreSQL 16, Redis 7 |
 | **AI/ML** | XGBoost, SHAP, scikit-learn, pandas |
-| **LLM** | Google Gemini (`gemini-1.5-flash`) via per-module key pools |
+| **LLM** | Google Gemini (`gemini-2.0-flash`) via single API key |
 | **DevOps** | Docker, Docker Compose |
 | **Auth** | JWT (python-jose), PBKDF2-SHA256 (passlib) |
 
@@ -140,7 +140,7 @@ All LLM calls route through `GeminiPoolClient` — a module-isolated key pool wi
 
 ## Gemini API Key Setup
 
-CampusIQ uses Google Gemini exclusively for all LLM features. You need at least one API key.
+CampusIQ uses Google Gemini exclusively for all LLM features. You need one API key.
 
 ### Get a free key
 
@@ -148,35 +148,17 @@ CampusIQ uses Google Gemini exclusively for all LLM features. You need at least 
 2. Sign in with a Google account
 3. Click **Create API key** → copy it
 
-Free tier gives 15 requests/minute and 1 million tokens/day per key — enough for development and demos.
+Free tier gives 15 requests/minute and 1 million tokens/day — enough for development and demos.
 
-### How the key pool works
+### Configuration
 
-CampusIQ splits LLM calls across five isolated module pools:
+CampusIQ uses a single Gemini API key for all AI features. Set it in your `.env`:
 
-| Pool variable | Used by |
-|---|---|
-| `GEMINI_NLP_KEYS` | Command Console planner + NLP CRUD engine |
-| `GEMINI_CHAT_KEYS` | AI Chatbot |
-| `GEMINI_PREDICTIONS_KEYS` | Grade prediction explanations |
-| `GEMINI_FINANCE_KEYS` | Finance module queries |
-| `GEMINI_HR_KEYS` | HR / payroll module queries |
-
-**Each pool is a comma-separated list of keys.** When one key hits the rate limit, the next key in the list is tried automatically. If a pool is empty, the fallback `GOOGLE_API_KEY` is used.
-
-**Minimum setup (1 key):**
 ```env
-GOOGLE_API_KEY=AIza...your-key-here
+GEMINI_API_KEY=AIza...your-key-here
 ```
 
-**Recommended setup (2–3 keys for demo/presentation):**
-```env
-GOOGLE_API_KEY=AIza...key1          # primary fallback
-GEMINI_NLP_KEYS=AIza...key1,AIza...key2,AIza...key3
-GEMINI_CHAT_KEYS=AIza...key1,AIza...key2
-```
-
-Using separate keys per module means Command Console queries don't consume the chatbot's quota and vice versa — no request will ever fail from rate limiting during a demo.
+The client includes automatic retry with exponential backoff. Free tier gives 15 requests/minute — enough for development and demos.
 
 ---
 
@@ -191,15 +173,9 @@ cd project-expo/backend
 cp .env.example .env
 ```
 
-Open `.env` and set at minimum:
+Open `.env` and set:
 ```env
-GOOGLE_API_KEY=AIza...your-key-here
-```
-
-Optionally add more keys per module for better throughput:
-```env
-GEMINI_NLP_KEYS=AIza...key1,AIza...key2
-GEMINI_CHAT_KEYS=AIza...key1,AIza...key2
+GEMINI_API_KEY=AIza...your-key-here
 ```
 
 **Step 2 — Start everything**
@@ -245,7 +221,7 @@ cd backend
 
 # Copy and configure environment
 cp .env.example .env
-# Edit .env — set GOOGLE_API_KEY at minimum (see Key Setup section above)
+# Edit .env — set GEMINI_API_KEY at minimum (see Key Setup section above)
 
 # Create virtual environment
 python -m venv venv
@@ -294,16 +270,13 @@ npm run dev                      # runs at http://localhost:5173
 ## How the Command Console Works
 
 1. **Type a natural language command** — e.g. *"Show all students in Computer Science with CGPA below 6"*
-2. **AI planning** — Gemini parses intent, entity, and filters into a structured action plan (falls back to keyword parsing if Gemini is unavailable)
-3. **Risk classification** — every action is rated LOW / MEDIUM / HIGH
-   - `LOW` (READ, ANALYZE, NAVIGATE) → auto-executed instantly
-   - `MEDIUM` (UPDATE) → shown to user with preview, requires confirmation
-   - `HIGH` (CREATE, DELETE) → requires confirmation + optional 2FA
-4. **Approval** — user reviews affected records, optionally selects per-record, confirms or rejects
-5. **Execution** — action runs through the NLP CRUD engine with RBAC enforcement
-6. **Audit trail** — every action (whether executed, rejected, or failed) is logged immutably
+2. **AI parsing** — Gemini extracts intent, entity, and filters (falls back to keyword parsing if Gemini is unavailable)
+3. **Risk classification** — every action is rated LOW / MEDIUM / HIGH based on operation type and affected record count
+4. **Direct execution** — all operations execute immediately with RBAC enforcement, no approval gates
+5. **Rollback support** — every write operation captures before/after state for one-click undo
+6. **Audit trail** — every action (whether executed or failed) is logged immutably
 
-The **Governance Dashboard** (`/governance`, admin only) shows all pending approvals, live operation stats, and the full audit trail with risk/module/operation filters.
+The **Governance Dashboard** (`/governance`, admin only) shows live operation stats, risk distribution, and the full audit trail with risk/module/operation filters.
 
 ---
 
@@ -314,8 +287,8 @@ project-expo/
 ├── frontend/
 │   └── src/
 │       ├── pages/
-│       │   ├── CopilotPanel.jsx         # Command Console (NL → Plan → Execute)
-│       │   ├── GovernanceDashboard.jsx  # Admin oversight + pending approvals
+│       │   ├── CopilotPanel.jsx         # Command Console (NL → Execute → Result)
+│       │   ├── GovernanceDashboard.jsx  # Admin oversight + audit trail
 │       │   ├── StudentDashboard.jsx
 │       │   ├── FacultyConsole.jsx
 │       │   ├── AdminPanel.jsx
@@ -324,24 +297,24 @@ project-expo/
 │       │   └── Timetable.jsx
 │       ├── components/
 │       │   ├── ChatWidget.jsx           # Floating Gemini chatbot
-│       │   └── Sidebar.jsx              # Live pending approval badge
+│       │   └── Sidebar.jsx              # Navigation sidebar
 │       └── services/api.js              # All API methods
 │
 ├── backend/
 │   ├── app/
 │   │   ├── services/
-│   │   │   ├── gemini_pool_service.py   # Key pool: generate_json + generate_text
+│   │   │   ├── gemini_pool_service.py   # Single-key Gemini client: ask_json + ask
 │   │   │   ├── nlp_crud_service.py      # Intent detection + CRUD execution
 │   │   │   ├── chatbot_service.py       # Context-aware Gemini chat
-│   │   │   ├── conversational_ops_service.py  # Primary AI ops + audit
+│   │   │   ├── conversational_ops_service.py  # Direct-execution AI ops + audit
 │   │   │   ├── attendance_service.py
 │   │   │   └── prediction_service.py
 │   │   ├── api/routes/
 │   │   │   ├── operational_ai.py        # /ops-ai/* endpoints
-│   │   │   ├── copilot.py               # Legacy compatibility (uses conversational_ops)
+│   │   │   ├── copilot.py               # Legacy compatibility
 │   │   │   └── chatbot.py
 │   │   ├── models/models.py
-│   │   ├── core/config.py               # Gemini key pool config
+│   │   ├── core/config.py               # Single Gemini key config
 │   │   └── seed_db.py
 │   ├── .env.example
 │   └── requirements.txt
@@ -355,13 +328,13 @@ project-expo/
 ## Troubleshooting
 
 **AI features return "no response" or use fallback:**
-- Verify `GOOGLE_API_KEY` is set correctly in `.env`
+- Verify `GEMINI_API_KEY` is set correctly in `.env`
 - Check the key is active at https://aistudio.google.com/app/apikey
-- Check backend logs: `docker-compose logs backend` — look for `GeminiPoolError`
+- Check backend logs: `docker-compose logs backend` — look for `GeminiError`
 
 **Rate limit errors (`429`) during heavy use:**
-- Add 2–3 more keys to `GEMINI_NLP_KEYS` and `GEMINI_CHAT_KEYS` (comma-separated)
-- Free tier: 15 RPM per key — 3 keys gives 45 RPM per module
+- Free tier: 15 RPM per key — wait 60 seconds for quota reset
+- The client has automatic retry with exponential backoff
 
 **Database already seeded warning:**
 - Normal on restart — the seeder is idempotent and skips if data exists

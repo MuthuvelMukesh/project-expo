@@ -1,77 +1,39 @@
 version: '3.8'
 
 services:
-  # ── PostgreSQL Database ──────────────────────
   db:
-    image: postgres:16-alpine
-    container_name: campusiq-db-prod
+    image: postgres:16
     environment:
-      POSTGRES_USER: campusiq
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-campusiq_secret}
       POSTGRES_DB: campusiq
-    ports:
-      - "5433:5432"
+      POSTGRES_USER: campusiq
+      POSTGRES_PASSWORD: campusiq_secret
     volumes:
-      - postgres_prod_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U campusiq"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
-  # ── Redis Cache ──────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: campusiq-redis-prod
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_prod_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # ── Single Combined Server (Backend + Frontend) ──────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile.production
-    container_name: campusiq-app
-    environment:
-      DATABASE_URL: postgresql+asyncpg://campusiq:${DB_PASSWORD:-campusiq_secret}@db:5432/campusiq
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: ${SECRET_KEY:-campusiq-secret-key-change-in-production}
-      # Google Gemini Configuration
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      GOOGLE_BASE_URL: ${GOOGLE_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
-      GOOGLE_MODEL: ${GOOGLE_MODEL:-gemini-1.5-flash}
-      # Per-module Gemini key pools
-      GEMINI_NLP_KEYS: ${GEMINI_NLP_KEYS:-}
-      GEMINI_PREDICTIONS_KEYS: ${GEMINI_PREDICTIONS_KEYS:-}
-      GEMINI_FINANCE_KEYS: ${GEMINI_FINANCE_KEYS:-}
-      GEMINI_HR_KEYS: ${GEMINI_HR_KEYS:-}
-      GEMINI_CHAT_KEYS: ${GEMINI_CHAT_KEYS:-}
-      GEMINI_RETRY_ETA_SECONDS: ${GEMINI_RETRY_ETA_SECONDS:-60}
-      MODEL_PATH: app/ml/models
     ports:
       - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://campusiq:campusiq_secret@db:5432/campusiq
+      - SECRET_KEY=${SECRET_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - DEBUG=false
+      - SERVE_FRONTEND=true
+      - FRONTEND_DIST_PATH=../frontend/dist
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
 volumes:
-  postgres_prod_data:
-  redis_prod_data:
+  postgres_data:

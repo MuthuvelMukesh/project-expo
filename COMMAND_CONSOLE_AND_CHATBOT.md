@@ -23,13 +23,13 @@ CampusIQ has **two distinct AI interfaces** that serve different purposes:
 |---------|--------------------------|---------|
 | **Purpose** | Execute database operations | Answer questions conversationally |
 | **Output** | Structured data + execute actions | Natural language responses |
-| **Risk Handling** | Multi-level approval workflow | None (read-only) |
+| **Risk Handling** | Risk classification + audit logging | None (read-only) |
 | **Audit Trail** | Full immutable audit log | None |
 | **File** | `conversational_ops_service.py` | `chatbot_service.py` |
 
 ### Why Two Systems?
 
-1. **Command Console** — For operational tasks like "Update all CSE students' semester to 4" which modify data and need approval workflows.
+1. **Command Console** — For operational tasks like "Update all CSE students' semester to 4" which modify data and are executed directly with full audit logging.
 
 2. **Chatbot** — For conversational queries like "What is my attendance?" which only need quick responses with live data.
 
@@ -37,7 +37,7 @@ CampusIQ has **two distinct AI interfaces** that serve different purposes:
 
 ## 2. LLM Client Architecture
 
-Both systems use a unified LLM client: `GeminiPoolClient`
+Both systems use a unified LLM client: `GeminiClient`
 
 ### File: `backend/app/services/gemini_pool_service.py`
 
@@ -48,85 +48,57 @@ Both systems use a unified LLM client: `GeminiPoolClient`
 │                                                                 │
 │  ┌─────────────────┐                                           │
 │  │  Application    │  Command Console or Chatbot               │
-│  │  Layer          │  calls GeminiPoolClient methods           │
+│  │  Layer          │  calls GeminiClient methods               │
 │  └────────┬────────┘                                           │
 │           │                                                     │
 │           ▼                                                     │
 │  ┌─────────────────────────────────────────────────────┐       │
-│  │              GeminiPoolClient                        │       │
+│  │                  GeminiClient                        │       │
 │  │                                                      │       │
-│  │  • generate_json(module, prompt)  → for parsing     │       │
-│  │  • generate_text(module, system, user) → for chat   │       │
-│  └────────┬─────────────────────┬──────────────────────┘       │
-│           │                     │                              │
-│           ▼                     ▼                              │
-│  ┌─────────────────┐   ┌─────────────────┐                    │
-│  │  OpenRouter     │   │  Google Gemini  │                    │
-│  │  (Primary)      │   │  (Fallback)     │                    │
-│  │                 │   │                 │                    │
-│  │  Model:         │   │  Model:         │                    │
-│  │  liquid/lfm-2.5 │   │  gemini-2.0     │                    │
-│  │  -1.2b-thinking │   │  -flash         │                    │
-│  └─────────────────┘   └─────────────────┘                    │
+│  │  • ask_json(prompt)  → structured JSON parsing      │       │
+│  │  • ask(prompt)       → plain text for chat          │       │
+│  └────────────────────────┬────────────────────────────┘       │
+│                           │                                     │
+│                           ▼                                     │
+│              ┌─────────────────────┐                            │
+│              │  Google Gemini      │                            │
+│              │  (Single API Key)   │                            │
+│              │                     │                            │
+│              │  Model:             │                            │
+│              │  gemini-2.0-flash   │                            │
+│              └─────────────────────┘                            │
 │                                                                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Methods
 
-**1. `generate_json(module, prompt)` — For NLP Parsing**
+**1. `ask_json(prompt)` — For NLP Parsing**
 
 ```python
-async def generate_json(module: str, prompt: str, timeout: float = 25.0) -> dict:
+async def ask_json(self, prompt: str) -> dict:
     """
-    Returns: {"ok": True, "text": "<raw JSON string>"} 
+    Returns: Parsed JSON dict from Gemini response
     
     Steps:
-    1. Check if OpenRouter is configured (OPENROUTER_API_KEY exists)
-    2. If yes → call OpenRouter with system prompt "Return only valid JSON"
-    3. If OpenRouter fails or not configured → try Gemini keys
-    4. If all fail → raise GeminiPoolError
+    1. Send prompt to Gemini with temperature=0.1 (low for accuracy)
+    2. Parse response as JSON
+    3. If parsing fails → raise GeminiError
     """
 ```
 
-**2. `generate_text(module, system_prompt, user_message)` — For Chat**
+**2. `ask(prompt)` — For Chat**
 
 ```python
-async def generate_text(
-    module: str,
-    system_prompt: str,
-    user_message: str,
-    temperature: float = 0.4,
-) -> str:
+async def ask(self, prompt: str) -> str:
     """
     Returns: Plain text response string
     
     Steps:
-    1. Check if OpenRouter is configured
-    2. If yes → call with system prompt + user message
-    3. If fails → try Gemini fallback
-    4. Temperature 0.4 allows some creativity while staying factual
+    1. Send prompt to Gemini with temperature=0.4
+    2. Return raw text response
+    3. Temperature 0.4 allows some creativity while staying factual
     """
-```
-
-### OpenRouter Request Format
-
-```python
-# OpenRouter uses OpenAI-compatible API format
-payload = {
-    "model": "liquid/lfm-2.5-1.2b-thinking:free",
-    "messages": [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message}
-    ],
-    "temperature": 0.1  # Low for JSON, 0.4 for chat
-}
-
-headers = {
-    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-    "HTTP-Referer": "https://campusiq.edu",
-    "X-Title": "CampusIQ"
-}
 ```
 
 ---
@@ -135,7 +107,7 @@ headers = {
 
 ### Purpose
 
-Convert natural language into **safe, auditable database operations** with approval workflows.
+Convert natural language into **safe, auditable database operations** with direct execution.
 
 ### Complete Pipeline
 
@@ -150,7 +122,7 @@ Convert natural language into **safe, auditable database operations** with appro
 │  ┌──────────────────────────────────────────────────────┐      │
 │  │ STEP 1: INTENT EXTRACTION (_extract_intent)          │      │
 │  │                                                       │      │
-│  │ Uses LLM (OpenRouter/Gemini) with this prompt:       │      │
+│  │ Uses GeminiClient.ask_json() with this prompt:       │      │
 │  │                                                       │      │
 │  │ "Extract a strict JSON object for ERP operations:    │      │
 │  │  - intent: READ|CREATE|UPDATE|DELETE|ANALYZE         │      │
@@ -166,7 +138,7 @@ Convert natural language into **safe, auditable database operations** with appro
 │                          │                                      │
 │                          ▼                                      │
 │  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 2: CLARIFICATION CHECK (_clarification_needed)  │      │
+│  │ STEP 2: CLARIFICATION CHECK                          │      │
 │  │                                                       │      │
 │  │ if confidence < 0.75 OR ambiguity.is_ambiguous:      │      │
 │  │   return {                                            │      │
@@ -180,129 +152,71 @@ Convert natural language into **safe, auditable database operations** with appro
 │  │ STEP 3: PERMISSION GATE (_permission_gate)           │      │
 │  │                                                       │      │
 │  │ ROLE_MATRIX defines what each role can do:           │      │
-│  │                                                       │      │
-│  │ student:                                              │      │
-│  │   READ: {student, course, department, attendance}    │      │
-│  │   CREATE/UPDATE/DELETE: ❌ (restricted)              │      │
-│  │                                                       │      │
-│  │ faculty:                                              │      │
-│  │   READ: all entities                                  │      │
-│  │   CREATE: {attendance}                               │      │
-│  │   UPDATE: {attendance, course}                       │      │
-│  │   DELETE: ❌                                          │      │
-│  │                                                       │      │
-│  │ admin:                                                │      │
-│  │   READ/CREATE/UPDATE/DELETE: all entities ✔          │      │
+│  │ student: READ only (limited entities)                │      │
+│  │ faculty: READ all + CREATE/UPDATE attendance         │      │
+│  │ admin:   Full CRUD access                            │      │
 │  │                                                       │      │
 │  │ Also checks department scope isolation               │      │
 │  └───────────────────────┬──────────────────────────────┘      │
 │                          │                                      │
 │                          ▼                                      │
 │  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 4: IMPACT ESTIMATION (_estimate_impact)         │      │
+│  │ STEP 4: IMPACT ESTIMATION + RISK CLASSIFICATION      │      │
 │  │                                                       │      │
-│  │ SELECT COUNT(*) FROM students                         │      │
-│  │ WHERE department_id = X AND cgpa < 6.0               │      │
-│  │                                                       │      │
-│  │ Result: 12 records will be affected                  │      │
-│  └───────────────────────┬──────────────────────────────┘      │
-│                          │                                      │
-│                          ▼                                      │
-│  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 5: RISK CLASSIFICATION (_classify_risk)         │      │
+│  │ SELECT COUNT(*) FROM entity WHERE filters             │      │
 │  │                                                       │      │
 │  │ LOW:  READ/ANALYZE operations                        │      │
 │  │ MEDIUM: UPDATE/CREATE with <25 records               │      │
-│  │ HIGH:                                                 │      │
-│  │   - DELETE any records                                │      │
-│  │   - Affects >25 records                               │      │
-│  │   - Modifies salary/financial fields                  │      │
-│  │   - User/permission modifications                     │      │
+│  │ HIGH: DELETE, >25 records, salary/financial fields   │      │
 │  └───────────────────────┬──────────────────────────────┘      │
 │                          │                                      │
 │                          ▼                                      │
 │  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 6: PREVIEW GENERATION (_build_preview)          │      │
+│  │ STEP 5: EXECUTE OPERATION                             │      │
 │  │                                                       │      │
-│  │ {                                                     │      │
-│  │   "affected_records": [                               │      │
-│  │     {"id": 5, "roll": "CSE2023005", "cgpa": 5.8},    │      │
-│  │     {"id": 12, "roll": "CSE2023012", "cgpa": 5.2}    │      │
-│  │   ],                                                  │      │
-│  │   "proposed_changes": [...],  // for UPDATE          │      │
-│  │   "rollback_plan": {                                  │      │
-│  │     "strategy": "before_state_snapshot",             │      │
-│  │     "supports_rollback": true                        │      │
-│  │   }                                                   │      │
-│  │ }                                                     │      │
+│  │ • Capture before_state snapshot                       │      │
+│  │ • Execute the database operation (CRUD)              │      │
+│  │ • Capture after_state snapshot                        │      │
+│  │ • Save OperationalPlan + OperationalExecution        │      │
 │  └───────────────────────┬──────────────────────────────┘      │
 │                          │                                      │
 │                          ▼                                      │
 │  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 7: PLAN STATUS DETERMINATION                     │      │
+│  │ STEP 6: AUDIT LOG + RETURN RESULT                     │      │
 │  │                                                       │      │
-│  │ LOW risk + READ + allowed → "ready_for_execution"    │      │
-│  │ MEDIUM risk → "awaiting_confirmation"                │      │
-│  │ HIGH risk → "awaiting_approval" (senior admin)       │      │
-│  │ Needs clarification → "clarification_required"       │      │
-│  └───────────────────────┬──────────────────────────────┘      │
-│                          │                                      │
-│                          ▼                                      │
-│  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 8: SAVE PLAN TO DATABASE                         │      │
+│  │ INSERT INTO immutable_audit_logs (...)                │      │
 │  │                                                       │      │
-│  │ INSERT INTO operational_plans (                       │      │
-│  │   plan_id, user_id, message, intent_type, entity,    │      │
-│  │   filters, values, risk_level, status, preview...    │      │
-│  │ )                                                     │      │
-│  └───────────────────────┬──────────────────────────────┘      │
-│                          │                                      │
-│                          ▼                                      │
-│  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 9: CREATE AUDIT LOG (_audit)                     │      │
-│  │                                                       │      │
-│  │ INSERT INTO immutable_audit_logs (                    │      │
-│  │   event_id, plan_id, user_id, role, operation_type,  │      │
-│  │   event_type, risk_level, intent_payload             │      │
-│  │ )                                                     │      │
-│  └───────────────────────┬──────────────────────────────┘      │
-│                          │                                      │
-│                          ▼                                      │
-│  ┌──────────────────────────────────────────────────────┐      │
-│  │ STEP 10: AUTO-EXECUTE IF READY                        │      │
-│  │                                                       │      │
-│  │ if status == "ready_for_execution":                  │      │
-│  │   → execute_operational_plan()                       │      │
-│  │   → Return results immediately                       │      │
-│  │                                                       │      │
-│  │ else:                                                 │      │
-│  │   → Return plan for user confirmation/approval       │      │
+│  │ Return: {plan_id, execution_id, status,              │      │
+│  │          affected_count, before_state, after_state}   │      │
 │  └──────────────────────────────────────────────────────┘      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Execution Pipeline (execute_operational_plan)
+### Execution Details
+
+The `create_and_execute()` function handles the entire flow in a single call:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              EXECUTION PIPELINE                                  │
+│              EXECUTION FLOW (inside create_and_execute)          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  1. LOAD PLAN from database                                     │
+│  1. EXTRACT INTENT from natural language                        │
 │       │                                                         │
 │       ▼                                                         │
-│  2. VALIDATE STATUS                                             │
-│     - Not in clarification_required/rejected/escalated          │
-│     - If requires_senior_approval → must be "approved"          │
+│  2. CHECK PERMISSIONS against ROLE_MATRIX                       │
 │       │                                                         │
 │       ▼                                                         │
-│  3. CAPTURE BEFORE STATE                                        │
+│  3. ESTIMATE IMPACT + CLASSIFY RISK                             │
+│       │                                                         │
+│       ▼                                                         │
+│  4. CAPTURE BEFORE STATE                                        │
 │     rows = SELECT * FROM entity WHERE filters                   │
 │     before_state = [serialize each row to dict]                 │
 │       │                                                         │
 │       ▼                                                         │
-│  4. EXECUTE BASED ON INTENT                                     │
+│  5. EXECUTE BASED ON INTENT                                     │
 │                                                                 │
 │     READ/ANALYZE:                                               │
 │       → No changes, just return before_state                    │
@@ -322,19 +236,13 @@ Convert natural language into **safe, auditable database operations** with appro
 │       → after_state = []                                        │
 │       │                                                         │
 │       ▼                                                         │
-│  5. UPDATE EXECUTION RECORD                                     │
-│     execution.status = "executed"                               │
-│     execution.before_state = [...]                              │
-│     execution.after_state = [...]                               │
-│       │                                                         │
-│       ▼                                                         │
-│  6. CREATE AUDIT LOG                                            │
+│  6. SAVE PLAN + EXECUTION + AUDIT LOG                           │
 │     Records complete before/after state for rollback            │
 │       │                                                         │
 │       ▼                                                         │
 │  7. RETURN RESULT                                               │
 │     {plan_id, execution_id, status, affected_count,             │
-│      before_state, after_state}                                 │
+│      before_state, after_state, summary}                        │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -347,7 +255,7 @@ Convert natural language into **safe, auditable database operations** with appro
 prompt = f"""
 Extract a strict JSON object for ERP operations from this user message.
 Return keys exactly:
-intent: READ|CREATE|UPDATE|DELETE|ANALYZE|ESCALATE
+intent: READ|CREATE|UPDATE|DELETE|ANALYZE
 entity: canonical lowercase singular entity
 filters: object
 scope: object
@@ -494,12 +402,9 @@ Provide **conversational responses** with live user context, without modifying d
 │           │                   │ STEP 4: QUERY LLM       │      │
 │           │                   │ (_query_gemini)         │      │
 │           │                   │                         │      │
-│           │                   │ GeminiPoolClient        │      │
-│           │                   │   .generate_text(       │      │
-│           │                   │     module="chat",      │      │
-│           │                   │     system_prompt=...,  │      │
-│           │                   │     user_message=...,   │      │
-│           │                   │     temperature=0.4     │      │
+│           │                   │ GeminiClient            │      │
+│           │                   │   .ask(                 │      │
+│           │                   │     prompt=system+user, │      │
 │           │                   │   )                     │      │
 │           │                   └────────────┬────────────┘      │
 │           │                                │                    │
@@ -639,28 +544,16 @@ def _rule_based_response(message: str, user_role: str) -> str:
 ### Command Console Flow
 
 ```
-User → POST /api/ops-ai/plan → create_operational_plan()
+User → POST /api/ops-ai/execute → create_and_execute()
                                     │
                                     ├── _extract_intent() → LLM
                                     ├── _permission_gate()
                                     ├── _estimate_impact()
                                     ├── _classify_risk()
-                                    ├── _build_preview()
-                                    └── Save OperationalPlan
-                                    │
-                                    ▼
-                          [Status: ready_for_execution?]
-                                    │
-               YES ─────────────────┴───────────────── NO
-                │                                       │
-                ▼                                       ▼
-     execute_operational_plan()              Return plan for
-                │                            user confirmation
-                ├── Load before_state
-                ├── Execute SQL
-                ├── Save after_state
-                ├── Create audit log
-                └── Return results
+                                    ├── Execute operation
+                                    ├── Save OperationalPlan + Execution
+                                    ├── Create audit log
+                                    └── Return results
 ```
 
 ### Chatbot Flow
@@ -714,14 +607,12 @@ User → POST /api/chatbot/ → process_query()
 **conversational_ops_service.py**
 | Function | Purpose |
 |----------|---------|
-| `create_operational_plan()` | Main entry point - creates plan from NL |
-| `execute_operational_plan()` | Execute approved/ready plan |
-| `add_approval_decision()` | Handle senior approval for HIGH risk |
+| `create_and_execute()` | Main entry point - parses NL and executes directly |
+| `rollback_execution()` | Rollback a previously executed operation |
 | `_extract_intent()` | Call LLM for intent parsing |
 | `_keyword_intent()` | Fallback regex-based parser |
 | `_permission_gate()` | Check role + department permissions |
 | `_classify_risk()` | Determine LOW/MEDIUM/HIGH risk |
-| `_build_preview()` | Generate affected records preview |
 | `_audit()` | Create immutable audit log entry |
 
 **chatbot_service.py**
@@ -736,10 +627,8 @@ User → POST /api/chatbot/ → process_query()
 **gemini_pool_service.py**
 | Function | Purpose |
 |----------|---------|
-| `generate_json()` | LLM call for JSON output |
-| `generate_text()` | LLM call for prose output |
-| `_openrouter_request()` | Make OpenRouter API call |
-| `_use_openrouter()` | Check if OpenRouter configured |
+| `GeminiClient.ask_json()` | LLM call for JSON output |
+| `GeminiClient.ask()` | LLM call for prose output |
 
 ### Database Tables
 
@@ -756,7 +645,7 @@ CREATE TABLE operational_plans (
     values JSONB,                -- For CREATE/UPDATE
     confidence FLOAT,            -- LLM confidence 0-1
     risk_level VARCHAR,          -- LOW/MEDIUM/HIGH
-    status VARCHAR,              -- ready_for_execution/awaiting_approval/etc
+    status VARCHAR,              -- ready_for_execution/executed/failed/rolled_back
     preview JSONB,               -- Affected records preview
     rollback_plan JSONB,         -- How to undo
     created_at TIMESTAMP
@@ -798,20 +687,20 @@ CREATE TABLE immutable_audit_logs (
 
 ### Command Console
 
-**Create a plan:**
+**Execute a command:**
 ```bash
-curl -X POST http://localhost:8000/api/ops-ai/plan \
+curl -X POST http://localhost:8000/api/ops-ai/execute \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"message": "Show all CSE students with CGPA below 6", "module": "nlp"}'
 ```
 
-**Execute a plan:**
+**Rollback an execution:**
 ```bash
-curl -X POST http://localhost:8000/api/ops-ai/execute \
+curl -X POST http://localhost:8000/api/ops-ai/rollback \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"plan_id": "ops_abc123def456"}'
+  -d '{"execution_id": "exec_abc123def456"}'
 ```
 
 ### Chatbot

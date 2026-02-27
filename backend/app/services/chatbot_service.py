@@ -11,12 +11,10 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from app.core.config import get_settings
+from app.core.config import settings
 from app.models.models import Student, Faculty, Course, Attendance, Prediction, User
 from app.services.nlp_crud_service import process_nlp_crud
-from app.services.gemini_pool_service import GeminiPoolClient, GeminiPoolError
-
-settings = get_settings()
+from app.services.gemini_pool_service import GeminiClient, GeminiError
 log = logging.getLogger("campusiq.chatbot")
 
 
@@ -216,16 +214,15 @@ def _build_system_prompt(user_role: str, user_context: str) -> str:
 
 
 async def _query_gemini(message: str, user_role: str, user_context: str) -> Optional[str]:
-    """Query Gemini via key pool for a conversational response."""
+    """Query Gemini for a conversational response."""
     try:
-        return await GeminiPoolClient.generate_text(
-            module="chat",
-            system_prompt=_build_system_prompt(user_role, user_context),
+        return await GeminiClient.ask(
             user_message=message,
+            system_prompt=_build_system_prompt(user_role, user_context),
             temperature=0.4,
         )
-    except GeminiPoolError as e:
-        log.warning("Gemini chat pool error: %s (code=%s)", e.message, e.code)
+    except GeminiError as e:
+        log.warning("Gemini chat error: %s", e)
         return None
     except Exception as e:
         log.error("Unexpected Gemini error in chatbot: %s", e, exc_info=True)
@@ -355,7 +352,7 @@ def _rule_based_response(message: str, user_role: str) -> str:
     return (
         "Hi! I'm CampusIQ AI. As an admin:\n\n"
         "- Use **Command Console** for natural language ERP operations\n"
-        "- Use **Governance Dashboard** for approvals and audit trail\n"
+        "- Use **Governance Dashboard** for audit trail and stats\n"
         "- Ask me: *How many students are there?* or *Show all departments*"
     )
 

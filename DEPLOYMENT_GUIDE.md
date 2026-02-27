@@ -135,15 +135,8 @@ DB_PASSWORD=your_secure_password
 SECRET_KEY=your_secret_key_here
 
 # Google Gemini API
-GOOGLE_API_KEY=your_gemini_api_key
-GOOGLE_MODEL=gemini-1.5-flash
-
-# Optional: Module-specific API keys
-GEMINI_NLP_KEYS=key1,key2,key3
-GEMINI_PREDICTIONS_KEYS=key1,key2
-GEMINI_FINANCE_KEYS=key1,key2
-GEMINI_HR_KEYS=key1,key2
-GEMINI_CHAT_KEYS=key1,key2
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ---

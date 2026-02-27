@@ -89,11 +89,8 @@ def test_settings():
     return Settings(
         DEBUG=True,
         DATABASE_URL=TEST_SQLALCHEMY_DATABASE_URL,
-        REDIS_URL="redis://localhost:6379/1",  # Use separate Redis DB for tests
         SECRET_KEY="test-secret-key",
-        OLLAMA_BASE_URL="http://localhost:11434",
-        OLLAMA_MODEL="gemma:2b",
-        LLM_PROVIDER="ollama",
+        GEMINI_API_KEY="test-key",
     )
 
 
